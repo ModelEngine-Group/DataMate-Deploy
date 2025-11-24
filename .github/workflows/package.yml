@@ -16,7 +16,7 @@ on:
 
 jobs:
   package-all:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
           LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           services=("runtime" "backend" "frontend" "database" "backend-python")
           for service in "${services[@]}"; do
-            docker pull ghcr.io/$LOWERCASE_REPO/datamate-$service:latest
+            docker pull ghcr.io/$LOWERCASE_REPO/datamate-$service:latest --platform arm64
             docker tag ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:latest
             docker save -o images/datamate/datamate-$service.tar datamate-$service:latest
             docker rmi ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:latest
@@ -66,7 +66,7 @@ jobs:
           LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           services=("backend" "frontend")
           for service in "${services[@]}"; do
-            docker pull ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest
+            docker pull ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest --platform arm64
             docker tag ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:latest
             docker save -o images/deer-flow/deer-flow-$service.tar deer-flow-$service:latest
             docekr rmi ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:latest
@@ -76,13 +76,13 @@ jobs:
         if: inputs.milvus == true
         run: |
           mkdir -p images/milvus
-          docker pull milvusdb/milvus:v2.6.2
+          docker pull milvusdb/milvus:v2.6.2 --platform arm64
           docker save -o images/milvus/milvus.tar milvusdb/milvus:v2.6.2
           docker rmi milvusdb/milvus:v2.6.2
-          docker pull minio/minio:RELEASE.2021-02-14T04-01-33Z
+          docker pull minio/minio:RELEASE.2021-02-14T04-01-33Z --platform arm64
           docker save -o images/milvus/minio.tar minio/minio:RELEASE.2021-02-14T04-01-33Z
           docker rmi minio/minio:RELEASE.2021-02-14T04-01-33Z
-          docker pull milvusdb/etcd:3.5.18-r1
+          docker pull milvusdb/etcd:3.5.18-r1 --platform arm64
           docker save -o images/milvus/etcd.tar milvusdb/etcd:3.5.18-r1
           docker rmi milvusdb/etcd:3.5.18-r1
 
