@@ -1,0 +1,97 @@
+name: DataMate Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      milvus:
+        type: boolean
+        description: 是否打包milvus
+        required: false
+        default: true
+      deer-flow:
+        type: boolean
+        description: 是否打包deer-flow
+        required: false
+        default: false
+
+jobs:
+  package-all:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone DataMate
+        uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+        with:
+          owner: ModelEngine-Group
+          repository: 'DataMate'
+          access-token: ${{ secrets.ACCESS_TOKEN }}
+
+      - name: DataMate Package
+        run: |
+          mkdir helm
+          cp -r DataMate/deployment/helm/datamate helm/datamate
+          sed -i "s#^\(\s*repository:\s*\).*#\1registry.krm.com:443/library/#" helm/datamate/values.yaml
+
+      - name: DeerFlow Package
+        if: inputs.deer-flow == true
+        run: |
+          cd DataMate
+          cp runtime/deer-flow/.env.example deployment/helm/deer-flow/charts/public/.env
+          cp runtime/deer-flow/conf.yaml.example deployment/helm/deer-flow/charts/public/conf.yaml
+          cp -r deployment/helm/deer-flow ../helm/deer-flow
+
+      - name: Milvus Package
+        if: inputs.milvus == true
+        run: |
+          cp -r DataMate/deployment/helm/milvus helm/milvus
+
+      - name: Download DataMate Image
+        run: |
+          mkdir -p images/datamate
+          LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          services=("runtime" "backend" "frontend" "database" "backend-python")
+          for service in "${services[@]}"; do
+            docker pull ghcr.io/$LOWERCASE_REPO/datamate-$service:latest
+            docker tag ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:latest
+            docker save -o images/datamate/datamate-$service.tar datamate-$service:latest
+            docker rmi ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:latest
+          done
+
+      - name: Download DeerFlow Image
+        if: inputs.deer-flow == true
+        run: |
+          mkdir -p images/deer-flow
+          LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          services=("backend" "frontend")
+          for service in "${services[@]}"; do
+            docker pull ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest
+            docker tag ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:latest
+            docker save -o images/deer-flow/deer-flow-$service.tar deer-flow-$service:latest
+            docekr rmi ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:latest
+          done
+
+      - name: Download Milvus Image
+        if: inputs.milvus == true
+        run: |
+          mkdir -p images/milvus
+          docker pull milvusdb/milvus:v2.6.2
+          docker save -o images/milvus/milvus.tar milvusdb/milvus:v2.6.2
+          docker rmi milvusdb/milvus:v2.6.2
+          docker pull minio/minio:RELEASE.2021-02-14T04-01-33Z
+          docker save -o images/milvus/minio.tar minio/minio:RELEASE.2021-02-14T04-01-33Z
+          docker rmi minio/minio:RELEASE.2021-02-14T04-01-33Z
+          docker pull milvusdb/etcd:3.5.18-r1
+          docker save -o images/milvus/etcd.tar milvusdb/etcd:3.5.18-r1
+          docker rmi milvusdb/etcd:3.5.18-r1
+
+      - name: Upload Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: DataMate
+          include-hidden-files: true
+          path: |
+            helm/
+            images/
+            tools/
