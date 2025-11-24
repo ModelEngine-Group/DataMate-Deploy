@@ -12,7 +12,7 @@
 ###       --skip-push                 Skip push images.
 ###   -h, --help                      Show this help message
 
-set -eo pipefail
+set -e
 
 DEFAULT_NAMESPACE="model-engine"
 NAMESPACE_KEY="namespace"
@@ -21,6 +21,7 @@ DATASET_PVC_KEY="dataset"
 STORAGE_CLASS_KEY="storageClass"
 STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
+REPO_KEY="repository"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
@@ -51,19 +52,23 @@ function load_images() {
   local module="$1"
   if [[ "$SKIP_LOAD" == "false" ]]; then
     log_info "Start to load images."
-    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "$registry_user" "$REPO" "$IMAGE_PATH/$module"
+    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "admin" "$REPO" "$IMAGE_PATH/$module"
   fi
 }
 
 function read_value() {
   if [[ ${SKIP_LOAD} == "false" && ${SKIP_PUSH} == "false" ]]; then
-    read -p "Enter your registry user: " -rs registry_user
+#    read -p "Enter your registry user: " -rs registry_user
     read -p "Enter your registry password: " -rs registry_password
     echo ""
   fi
 
   if [ -n "$NAMESPACE" ]; then
     sed -i "s/^\(\s*${NAMESPACE_KEY}:\s*\).*/\1${NAMESPACE}/" "$VALUES_FILE"
+  fi
+
+  if [ -n "$REPO" ]; then
+    sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
   fi
 
   if [ -n "$OPERATOR_PVC" ]; then
@@ -78,13 +83,13 @@ function read_value() {
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:\s*\).*/\1${STORAGE_CLASS}/" "$VALUES_FILE"
   else
     STORAGE_CLASS=$(grep -oP "(?<=$STORAGE_CLASS_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
-    STORAGE_NODE=$(grep -oP "(?<=$STORAGE_NODE_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
 
-  if [ "$STORAGE_CLASS" == "local-storage" ] && [ -n "$STORAGE_NODE" ]; then
+  STORAGE_NODE=$(grep -oP "(?<=$STORAGE_NODE_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
+  if [ "$STORAGE_CLASS" == "local-storage" ] && [ -z "$STORAGE_NODE" ]; then
     STORAGE_NODE=$(ps -ef | grep "[k]ubelet" | sed -n 's/.*--hostname-override=\([^ ]*\).*/\1/p')
-    if [[ -n "$STORAGE_NODE" ]]; then
-        STORAGE_NODE=$(hostname | tr '[:upper:]' '[:lower:]')
+    if [ -z "$STORAGE_NODE" ]; then
+      STORAGE_NODE=$(hostname | tr '[:upper:]' '[:lower:]')
     fi
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:\s*\).*/\1${STORAGE_NODE}/" "$VALUES_FILE"
   fi
@@ -99,7 +104,7 @@ function create_local_path() {
 
   if [ "$STORAGE_CLASS" == "local-storage" ]; then
     log_info "The storage type is local."
-    if [[ -z $STORAGE_PATH]]; then
+    if [[ -z $STORAGE_PATH ]]; then
       STORAGE_PATH="/opt/k8s/$NAMESPACE/datamate"
       sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH#" "$VALUES_FILE"
     fi
@@ -144,7 +149,7 @@ function create_local_path() {
       mkdir -p "$dir"
     done
 
-    cd -
+    cd -  >/dev/null
   fi
 }
 

@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
-          sed -i "s#^\(\s*repository:\s*\).*#\1registry.krm.com:443/library/#" helm/datamate/values.yaml
+          sed -i "s#^\(\s*repository:\s*\).*#\1\"\"#" helm/datamate/values.yaml
 
       - name: DeerFlow Package
         if: inputs.deer-flow == true
@@ -58,6 +58,9 @@ jobs:
             docker save -o images/datamate/datamate-$service.tar datamate-$service:latest
             docker rmi ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:latest
           done
+          docker pull quay.io/kuberay/operator:v1.4.2 --platform arm64
+          docker save -o images/datamate/kuberay-operator.tar quay.io/kuberay/operator:v1.4.2
+          docker rmi quay.io/kuberay/operator:v1.4.2
 
       - name: Download DeerFlow Image
         if: inputs.deer-flow == true

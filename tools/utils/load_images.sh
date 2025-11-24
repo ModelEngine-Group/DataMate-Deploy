@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-
 current_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 . "${current_dir}/common.sh"
 . "${current_dir}/log.sh"
