@@ -1,52 +1,71 @@
 #!/bin/bash
-### 这是一个用于部署Helm Chart的脚本，支持镜像推送和PVC动态配置。
+### This is a script for deploying Helm Charts, supporting image pushing and dynamic PVC configuration.
 ###
 ### Flags:
-###   -n, --ns, --namespace <ns>    部署的目标Kubernetes命名空间
-###       --repo <url>              目标镜像仓库地址 (例如: registry.com/myproject)
-###       --operator <size>         Operator的PVC容量 (例如: 50Gi)。将使用sed修改values.yaml
-###       --dataset <size>          Dataset的PVC容量 (例如: 200Gi)。将使用sed修改values.yaml
-###   -h, --help                    显示此帮助信息
+###   -n, --ns, --namespace <ns>      Target Kubernetes namespace for deployment.
+###       --dataset <size>            Specify the capacity of the dataset pvc.
+###       --operator <size>           Specify the capacity of the operator pvc.
+###       --path <path>               Specify the node of the local pvc.
+###       --repo <url>                Specify the image repository url.
+###       --sc, --storage-class <sc>  Specify the storage class name.
+###       --skip-load                 Skip load images. Images will still be imported.
+###       --skip-push                 Skip push images.
+###   -h, --help                      Show this help message
 
 set -eo pipefail
 
 DEFAULT_NAMESPACE="model-engine"
+NAMESPACE_KEY="namespace"
 OPERATOR_PVC_KEY="operator"
 DATASET_PVC_KEY="dataset"
 STORAGE_CLASS_KEY="storageClass"
+STORAGE_NODE_KEY="storageNode"
+STORAGE_PATH_KEY="storagePath"
+SKIP_PUSH=false
+SKIP_LOAD=false
+INSTALL_MILVUS=true
 
 
 # --- 脚本内部变量 ---
 NAMESPACE="$DEFAULT_NAMESPACE"
 STORAGE_CLASS="model-engine"
+STORAGE_NODE=""
+STORAGE_PATH=""
 REPO=""
 OPERATOR_PVC=""
 DATASET_PVC=""
 
 
 cd "$(dirname "$0")" || exit
-work_dir=$(pwd)
-SCRIPT_PATH="${work_dir}/install.sh"
-HELM_PATH="$(realpath "${work_dir}/../helm")"
+WORK_DIR=$(pwd)
+SCRIPT_PATH="${WORK_DIR}/install.sh"
+UTILS_PATH="${WORK_DIR}/utils"
+HELM_PATH="$(realpath "${WORK_DIR}/../helm")"
 VALUES_FILE="$(realpath "${HELM_PATH}/datamate/values.yaml")"
-IMAGE_PATH="$(realpath "${work_dir}/../images")"
+IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 
-. "${work_dir}/utils/common.sh"
-. "${work_dir}/utils/log.sh" && init_log
+. "${WORK_DIR}/utils/common.sh"
+. "${WORK_DIR}/utils/log.sh" && init_log
 
 function load_images() {
   local module="$1"
-  for file in "$IMAGE_PATH"/"$module"/*; do
-    image=$(docker load -i "$file")
-    if [ -n "$REPO" ]; then
-      name="$(echo "$image" | tail -n 1 | awk '{print $NF}')"
-      docker tag "$name" "$REPO$name"
-      docker push "$REPO$name"
-    fi
-  done
+  if [[ "$SKIP_LOAD" == "false" ]]; then
+    log_info "Start to load images."
+    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "$registry_user" "$REPO" "$IMAGE_PATH/$module"
+  fi
 }
 
 function read_value() {
+  if [[ ${SKIP_LOAD} == "false" && ${SKIP_PUSH} == "false" ]]; then
+    read -p "Enter your registry user: " -rs registry_user
+    read -p "Enter your registry password: " -rs registry_password
+    echo ""
+  fi
+
+  if [ -n "$NAMESPACE" ]; then
+    sed -i "s/^\(\s*${NAMESPACE_KEY}:\s*\).*/\1${NAMESPACE}/" "$VALUES_FILE"
+  fi
+
   if [ -n "$OPERATOR_PVC" ]; then
     sed -i "s/^\(\s*${OPERATOR_PVC_KEY}:\s*\).*/\1${OPERATOR_PVC}/" "$VALUES_FILE"
   fi
@@ -57,6 +76,75 @@ function read_value() {
 
   if [ -n "$STORAGE_CLASS" ]; then
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:\s*\).*/\1${STORAGE_CLASS}/" "$VALUES_FILE"
+  else
+    STORAGE_CLASS=$(grep -oP "(?<=$STORAGE_CLASS_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
+    STORAGE_NODE=$(grep -oP "(?<=$STORAGE_NODE_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
+  fi
+
+  if [ "$STORAGE_CLASS" == "local-storage" ] && [ -n "$STORAGE_NODE" ]; then
+    STORAGE_NODE=$(ps -ef | grep "[k]ubelet" | sed -n 's/.*--hostname-override=\([^ ]*\).*/\1/p')
+    if [[ -n "$STORAGE_NODE" ]]; then
+        STORAGE_NODE=$(hostname | tr '[:upper:]' '[:lower:]')
+    fi
+    sed -i "s/^\(\s*${STORAGE_NODE_KEY}:\s*\).*/\1${STORAGE_NODE}/" "$VALUES_FILE"
+  fi
+}
+
+function create_local_path() {
+  if [ -n "$STORAGE_PATH" ]; then
+    sed -i "s/^\(\s*${STORAGE_PATH_KEY}:\s*\).*/\1${STORAGE_PATH}/" "$VALUES_FILE"
+  else
+    STORAGE_PATH=$(grep -oP "(?<=$STORAGE_PATH_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
+  fi
+
+  if [ "$STORAGE_CLASS" == "local-storage" ]; then
+    log_info "The storage type is local."
+    if [[ -z $STORAGE_PATH]]; then
+      STORAGE_PATH="/opt/k8s/$NAMESPACE/datamate"
+      sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH#" "$VALUES_FILE"
+    fi
+    mkdir -p "$STORAGE_PATH"
+    cd "$STORAGE_PATH"
+    dirs=(dataset flow database operator log)
+    any_exist=false
+    for dir in "${dirs[@]}"; do
+      if [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]; then
+          any_exist=true
+          break
+      fi
+    done
+
+    if $any_exist; then
+      log_warn "The local directory $STORAGE_PATH is already in use. Please check whether the directory needs to be deleted."
+      while true
+      do
+        read -r -p "Are you sure? [Y/n]" -rs delete
+        echo ""
+        case $delete in
+          [yY][eE][sS]|[yY])
+            log_info "Directory $STORAGE_PATH deleted."
+            for dir in "${dirs[@]}"; do
+              rm -rf "$dir"
+            done
+            break
+            ;;
+          [nN][oO]|[nN])
+            log_info "Please manually clear the local directory $STORAGE_PATH or use another directory. The script stops running."
+            cd -
+            exit 1
+            ;;
+          *)
+            echo "Invalid input...Try again."
+            ;;
+        esac
+      done
+    fi
+
+    for dir in "${dirs[@]}"; do
+      mkdir -p "$dir"
+    done
+
+    cd -
   fi
 }
 
@@ -89,26 +177,30 @@ function install_milvus() {
 
 function install() {
   install_datamate
-  install_milvus
+  [ "$INSTALL_MILVUS" = "true" ] && install_milvus
 }
 
 function main() {
   while [[ "$#" -gt 0 ]]; do
     case $1 in
-      -n|--ns|--namespace) NAMESPACE="$2"; shift ;;
-      -sc|--storage-class) STORAGE_CLASS="$2"; shift ;;
-      --repo) REPO="${2%/}/"; shift ;;
-      --operator) OPERATOR_PVC="$2"; shift ;;
-      --dataset) DATASET_PVC="$2"; shift ;;
+      -n|--ns|--namespace) NAMESPACE="$2"; shift 2 ;;
+      --sc|--storage-class) STORAGE_CLASS="$2"; shift 2 ;;
+      --repo) REPO="${2%/}/"; shift 2 ;;
+      --operator) OPERATOR_PVC="$2"; shift 2 ;;
+      --path) STORAGE_PATH="$2"; shift 2 ;;
+      --dataset) DATASET_PVC="$2"; shift 2 ;;
+      --skip-push) SKIP_PUSH=true; shift ;;
+      --skip-load) SKIP_LOAD=true; shift ;;
+      --skip-milvus) INSTALL_MILVUS=false; shift ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
-#      *) log_info "错误: 未知参数: $1"; print_help "${SCRIPT_PATH}"; exit 1 ;;
+      *) log_info "错误: 未知参数: $1"; shift ;;
     esac
-    shift
   done
 
   read_value
+  create_local_path
   load_images "datamate"
-  load_images "milvus"
+  [ "$INSTALL_MILVUS" = "true" ] && load_images "milvus"
   install
 }
 
