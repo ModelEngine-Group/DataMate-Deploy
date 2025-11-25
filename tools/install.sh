@@ -43,6 +43,7 @@ SCRIPT_PATH="${WORK_DIR}/install.sh"
 UTILS_PATH="${WORK_DIR}/utils"
 HELM_PATH="$(realpath "${WORK_DIR}/../helm")"
 VALUES_FILE="$(realpath "${HELM_PATH}/datamate/values.yaml")"
+MILVUS_VALUES_FILE="$(realpath "${HELM_PATH}/milvus/values.yaml")"
 IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 
 . "${WORK_DIR}/utils/common.sh"
@@ -81,6 +82,7 @@ function read_value() {
 
   if [ -n "$STORAGE_CLASS" ]; then
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:\s*\).*/\1${STORAGE_CLASS}/" "$VALUES_FILE"
+    sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$MILVUS_VALUES_FILE"
   else
     STORAGE_CLASS=$(grep -oP "(?<=$STORAGE_CLASS_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
@@ -92,12 +94,14 @@ function read_value() {
       STORAGE_NODE=$(hostname | tr '[:upper:]' '[:lower:]')
     fi
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:\s*\).*/\1${STORAGE_NODE}/" "$VALUES_FILE"
+    sed -i "s/^\(\s*${STORAGE_NODE_KEY}:\s*\).*/\1${STORAGE_NODE}/" "$MILVUS_VALUES_FILE"
   fi
 }
 
-function create_local_path() {
+function read_storage_value() {
   if [ -n "$STORAGE_PATH" ]; then
-    sed -i "s/^\(\s*${STORAGE_PATH_KEY}:\s*\).*/\1${STORAGE_PATH}/" "$VALUES_FILE"
+    sed -i "s#^\(\s*${STORAGE_PATH_KEY}:\s*\).*#\1${STORAGE_PATH}/datamate#" "$VALUES_FILE"
+    sed -i "s#^\(\s*${STORAGE_PATH_KEY}:\s*\).*#\1${STORAGE_PATH}/milvus#" "$MILVUS_VALUES_FILE"
   else
     STORAGE_PATH=$(grep -oP "(?<=$STORAGE_PATH_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
@@ -105,52 +109,64 @@ function create_local_path() {
   if [ "$STORAGE_CLASS" == "local-storage" ]; then
     log_info "The storage type is local."
     if [[ -z $STORAGE_PATH ]]; then
-      STORAGE_PATH="/opt/k8s/$NAMESPACE/datamate"
-      sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH#" "$VALUES_FILE"
+      STORAGE_PATH="/opt/k8s/$NAMESPACE"
+      sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH/datamate#" "$VALUES_FILE"
+      sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH/milvus#" "$MILVUS_VALUES_FILE"
     fi
-    mkdir -p "$STORAGE_PATH"
-    cd "$STORAGE_PATH"
+    mkdir -p "$STORAGE_PATH/datamate"
+    cd "$STORAGE_PATH/datamate"
     dirs=(dataset flow database operator log)
-    any_exist=false
-    for dir in "${dirs[@]}"; do
-      if [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]; then
-          any_exist=true
-          break
-      fi
-    done
-
-    if $any_exist; then
-      log_warn "The local directory $STORAGE_PATH is already in use. Please check whether the directory needs to be deleted."
-      while true
-      do
-        read -r -p "Are you sure? [Y/n]" -rs delete
-        echo ""
-        case $delete in
-          [yY][eE][sS]|[yY])
-            log_info "Directory $STORAGE_PATH deleted."
-            for dir in "${dirs[@]}"; do
-              rm -rf "$dir"
-            done
-            break
-            ;;
-          [nN][oO]|[nN])
-            log_info "Please manually clear the local directory $STORAGE_PATH or use another directory. The script stops running."
-            cd -
-            exit 1
-            ;;
-          *)
-            echo "Invalid input...Try again."
-            ;;
-        esac
-      done
-    fi
-
-    for dir in "${dirs[@]}"; do
-      mkdir -p "$dir"
-    done
-
+    create_local_path $dirs
     cd -  >/dev/null
+
+    if [ "$INSTALL_MILVUS" == "true" ]; then
+      cd "$STORAGE_PATH/milvus"
+      dirs=(etcd minio milvus milvus-log)
+      create_local_path $dirs
+      cd -  >/dev/null
+    fi
   fi
+}
+
+function create_local_path() {
+  local dirs=$1
+  local any_exist=false
+  for dir in "${dirs[@]}"; do
+    if [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]; then
+        any_exist=true
+        break
+    fi
+  done
+
+  if $any_exist; then
+    log_warn "The local directory $STORAGE_PATH is already in use. Please check whether the directory needs to be deleted."
+    while true
+    do
+      read -r -p "Are you sure? [Y/n]" -rs delete
+      echo ""
+      case $delete in
+        [yY][eE][sS]|[yY])
+          log_info "Directory $STORAGE_PATH deleted."
+          for dir in "${dirs[@]}"; do
+            rm -rf "$dir"
+          done
+          break
+          ;;
+        [nN][oO]|[nN])
+          log_info "Please manually clear the local directory $STORAGE_PATH or use another directory. The script stops running."
+          cd -
+          exit 1
+          ;;
+        *)
+          echo "Invalid input...Try again."
+          ;;
+      esac
+    done
+  fi
+
+  for dir in "${dirs[@]}"; do
+    mkdir -p "$dir"
+  done
 }
 
 function helm_install() {
@@ -182,7 +198,7 @@ function install_milvus() {
 
 function install() {
   install_datamate
-  [ "$INSTALL_MILVUS" = "true" ] && install_milvus
+  [ "$INSTALL_MILVUS" == "true" ] && install_milvus
 }
 
 function main() {
@@ -203,9 +219,9 @@ function main() {
   done
 
   read_value
-  create_local_path
+  read_storage_value
   load_images "datamate"
-  [ "$INSTALL_MILVUS" = "true" ] && load_images "milvus"
+  [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
   install
 }
 
