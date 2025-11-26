@@ -33,6 +33,7 @@ jobs:
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
           sed -i "s#^\(\s*repository:\s*\).*#\1\"\"#" helm/datamate/values.yaml
+          sed -i "s#^\(\s*type:\s*\).*#\1ClusterIP#" helm/datamate/values.yaml
 
       - name: DeerFlow Package
         if: inputs.deer-flow == true
