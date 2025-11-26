@@ -18,10 +18,7 @@ UNINSTALL_MILVUS=true
 cd "$(dirname "$0")" || exit
 WORK_DIR=$(pwd)
 SCRIPT_PATH="${WORK_DIR}/install.sh"
-UTILS_PATH="${WORK_DIR}/utils"
 HELM_PATH="$(realpath "${WORK_DIR}/../helm")"
-VALUES_FILE="$(realpath "${HELM_PATH}/datamate/values.yaml")"
-IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 
 . "${WORK_DIR}/utils/common.sh"
 . "${WORK_DIR}/utils/log.sh" && init_log
@@ -56,6 +53,26 @@ function uninstall() {
   [ "$UNINSTALL_MILVUS" == "true" ] && uninstall_milvus
 }
 
+function remove_route_from_haproxy() {
+    log_info "Remove datamate route from haproxy"
+
+    local ori_cluster_info="${WORK_DIR}"/smartkube.yaml
+    local mid_smart_kube_yaml="${WORK_DIR}"/smartkube.yaml.mid
+    ## 将 cluster-info-smartkube 这个 configmap 保存到文件
+    kubectl get cm cluster-info-smartkube -n kube-system -o yaml > "${ori_cluster_info}"
+    cp -fH --remove-destination "${ori_cluster_info}" "${mid_smart_kube_yaml}"
+
+    ## 删除原来的配置
+    if grep -B 10000 'kind: ConfigMap' "${ori_cluster_info}" | grep 'section' >/dev/null 2>&1; then
+        sed "0,/datamate-section-${NAMESPACE}-end/{/datamate-section-${NAMESPACE}-begin/,/datamate-section-${NAMESPACE}-end/{d;}}" "${ori_cluster_info}" > "${mid_smart_kube_yaml}"
+    fi
+
+    ## 更新 cluster-info-smartkube 这个 configmap
+    kubectl replace -f "${mid_smart_kube_yaml}"
+
+    log_info "Finish remove datamate route from haproxy"
+}
+
 function main() {
   while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -66,6 +83,7 @@ function main() {
   done
 
   uninstall
+  remove_route_from_haproxy
 }
 
 main "$@"

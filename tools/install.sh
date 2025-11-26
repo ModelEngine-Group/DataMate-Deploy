@@ -23,7 +23,6 @@ STORAGE_CLASS_KEY="storageClass"
 STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
-PORT_KEY="nodePort"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
@@ -38,6 +37,7 @@ REPO=""
 OPERATOR_PVC=""
 DATASET_PVC=""
 PORT=""
+ADDRESS_TYPE="management"
 
 
 cd "$(dirname "$0")" || exit
@@ -73,10 +73,6 @@ function read_value() {
 
   if [ -n "$REPO" ]; then
     sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
-  fi
-
-  if [ -n "$PORT" ]; then
-    sed -i "s#^\(\s*${PORT_KEY}:\s*\).*#\1${PORT}#" "$VALUES_FILE"
   fi
 
   if [ -n "$OPERATOR_PVC" ]; then
@@ -210,9 +206,29 @@ function install() {
   [ "$INSTALL_MILVUS" == "true" ] && install_milvus
 }
 
+function add_route_to_haproxy() {
+    log_info_echo "Start config haproxy"
+    # 获取浮动IP
+    get_float_ip
+    # 获取 nginx service ip
+    nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
+    if ! g_check_ip "${nginx_service_ip}"; then
+        log_error_echo "Illegal nginx_service_ip: ${nginx_service_ip}"
+        exit 1
+    fi
+
+    ## 更新 oms 转发规则, 保存到 cluster_info_new.json
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}"; then
+        log_error "add_route_to_haproxy failed"
+        exit 1
+    fi
+    log_info_echo "Finish config haproxy"
+}
+
 function main() {
   while [[ "$#" -gt 0 ]]; do
     case $1 in
+      --address-type) ADDRESS_TYPE="$2"; shift 2 ;;
       -n|--ns|--namespace) NAMESPACE="$2"; shift 2 ;;
       --sc|--storage-class) STORAGE_CLASS="$2"; shift 2 ;;
       --repo) REPO="${2%/}/"; shift 2 ;;
@@ -233,6 +249,7 @@ function main() {
   load_images "datamate"
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
   install
+  add_route_to_haproxy
 }
 
 main "$@"
