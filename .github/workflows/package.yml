@@ -48,7 +48,6 @@ jobs:
         run: |
           cp -r DataMate/deployment/helm/milvus helm/milvus
           sed -i "s#^\(\s*workload:\s*\).*#\1deployment#" helm/milvus/values.yaml
-          cd helm/milvus/charts
 
       - name: Download DataMate Image
         run: |
