@@ -48,7 +48,6 @@ jobs:
           cp -r DataMate/deployment/helm/milvus helm/milvus
           sed -i "s#^\(\s*workload:\s*\).*#\1deployment#" helm/milvus/values.yaml
           cd helm/milvus/charts
-          rm -rf kafka pulsar pulsarv2 tei
 
       - name: Download DataMate Image
         run: |
@@ -85,9 +84,9 @@ jobs:
           docker pull milvusdb/milvus:v2.6.5 --platform arm64
           docker save -o images/milvus/milvus.tar milvusdb/milvus:v2.6.5
           docker rmi milvusdb/milvus:v2.6.5
-          docker pull minio/minio:RELEASE.2021-02-14T04-01-33Z --platform arm64
-          docker save -o images/milvus/minio.tar minio/minio:RELEASE.2021-02-14T04-01-33Z
-          docker rmi minio/minio:RELEASE.2021-02-14T04-01-33Z
+          docker pull minio/minio:RELEASE.2024-12-18T13-15-44Z --platform arm64
+          docker save -o images/milvus/minio.tar minio/minio:RELEASE.2024-12-18T13-15-44Z
+          docker rmi minio/minio:RELEASE.2024-12-18T13-15-44Z
           docker pull milvusdb/etcd:3.5.18-r1 --platform arm64
           docker save -o images/milvus/etcd.tar milvusdb/etcd:3.5.18-r1
           docker rmi milvusdb/etcd:3.5.18-r1

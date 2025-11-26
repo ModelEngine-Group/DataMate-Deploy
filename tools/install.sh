@@ -15,6 +15,7 @@
 set -e
 
 DEFAULT_NAMESPACE="model-engine"
+DEFAULT_STORAGE_CLASS="sc-system-manage"
 NAMESPACE_KEY="namespace"
 OPERATOR_PVC_KEY="operator"
 DATASET_PVC_KEY="dataset"
@@ -22,6 +23,7 @@ STORAGE_CLASS_KEY="storageClass"
 STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
+PORT_KEY="nodePort"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
@@ -29,12 +31,13 @@ INSTALL_MILVUS=true
 
 # --- 脚本内部变量 ---
 NAMESPACE="$DEFAULT_NAMESPACE"
-STORAGE_CLASS="model-engine"
+STORAGE_CLASS="$DEFAULT_STORAGE_CLASS"
 STORAGE_NODE=""
 STORAGE_PATH=""
 REPO=""
 OPERATOR_PVC=""
 DATASET_PVC=""
+PORT=""
 
 
 cd "$(dirname "$0")" || exit
@@ -72,6 +75,10 @@ function read_value() {
     sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
   fi
 
+  if [ -n "$PORT" ]; then
+    sed -i "s#^\(\s*${PORT_KEY}:\s*\).*#\1${PORT}#" "$VALUES_FILE"
+  fi
+
   if [ -n "$OPERATOR_PVC" ]; then
     sed -i "s/^\(\s*${OPERATOR_PVC_KEY}:\s*\).*/\1${OPERATOR_PVC}/" "$VALUES_FILE"
   fi
@@ -93,15 +100,15 @@ function read_value() {
     if [ -z "$STORAGE_NODE" ]; then
       STORAGE_NODE=$(hostname | tr '[:upper:]' '[:lower:]')
     fi
-    sed -i "s/^\(\s*${STORAGE_NODE_KEY}:\s*\).*/\1${STORAGE_NODE}/" "$VALUES_FILE"
-    sed -i "s/^\(\s*${STORAGE_NODE_KEY}:\s*\).*/\1${STORAGE_NODE}/" "$MILVUS_VALUES_FILE"
+    sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$VALUES_FILE"
+    sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$MILVUS_VALUES_FILE"
   fi
 }
 
 function read_storage_value() {
   if [ -n "$STORAGE_PATH" ]; then
-    sed -i "s#^\(\s*${STORAGE_PATH_KEY}:\s*\).*#\1${STORAGE_PATH}/datamate#" "$VALUES_FILE"
-    sed -i "s#^\(\s*${STORAGE_PATH_KEY}:\s*\).*#\1${STORAGE_PATH}/milvus#" "$MILVUS_VALUES_FILE"
+    sed -i "s#^\(\s*${STORAGE_PATH_KEY}:*\).*#\1 ${STORAGE_PATH}/datamate#" "$VALUES_FILE"
+    sed -i "s#^\(\s*${STORAGE_PATH_KEY}:*\).*#\1 ${STORAGE_PATH}/milvus#" "$MILVUS_VALUES_FILE"
   else
     STORAGE_PATH=$(grep -oP "(?<=$STORAGE_PATH_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
@@ -110,26 +117,28 @@ function read_storage_value() {
     log_info "The storage type is local."
     if [[ -z $STORAGE_PATH ]]; then
       STORAGE_PATH="/opt/k8s/$NAMESPACE"
-      sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH/datamate#" "$VALUES_FILE"
-      sed -i "s#storagePath: .*#storagePath: $STORAGE_PATH/milvus#" "$MILVUS_VALUES_FILE"
+      sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/datamate#" "$VALUES_FILE"
+      sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/milvus#" "$MILVUS_VALUES_FILE"
+    else
+      STORAGE_PATH=$(realpath "$STORAGE_PATH/../")
     fi
     mkdir -p "$STORAGE_PATH/datamate"
     cd "$STORAGE_PATH/datamate"
     dirs=(dataset flow database operator log)
-    create_local_path $dirs
+    create_local_path "${dirs[@]}"
     cd -  >/dev/null
 
     if [ "$INSTALL_MILVUS" == "true" ]; then
       cd "$STORAGE_PATH/milvus"
       dirs=(etcd minio milvus milvus-log)
-      create_local_path $dirs
+      create_local_path "${dirs[@]}"
       cd -  >/dev/null
     fi
   fi
 }
 
 function create_local_path() {
-  local dirs=$1
+  local dirs=("$@")
   local any_exist=false
   for dir in "${dirs[@]}"; do
     if [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]; then
@@ -209,6 +218,7 @@ function main() {
       --repo) REPO="${2%/}/"; shift 2 ;;
       --operator) OPERATOR_PVC="$2"; shift 2 ;;
       --path) STORAGE_PATH="$2"; shift 2 ;;
+      --port) PORT="$2"; shift 2 ;;
       --dataset) DATASET_PVC="$2"; shift 2 ;;
       --skip-push) SKIP_PUSH=true; shift ;;
       --skip-load) SKIP_LOAD=true; shift ;;

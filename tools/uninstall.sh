@@ -33,6 +33,7 @@ function helm_uninstall() {
 
   helm_args+=("uninstall" "$release_name")
   helm_args+=("--namespace" "$NAMESPACE")
+  helm_args+=("--ignore-not-found")
 
   log_info "即将执行: helm ${helm_args[*]}"
 
