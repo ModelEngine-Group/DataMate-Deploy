@@ -64,7 +64,7 @@ function remove_route_from_haproxy() {
 
     ## 删除原来的配置
     if grep -B 10000 'kind: ConfigMap' "${ori_cluster_info}" | grep 'section' >/dev/null 2>&1; then
-        sed "0,/datamate-section-${NAMESPACE}-end/{/datamate-section-${NAMESPACE}-begin/,/datamate-section-${NAMESPACE}-end/{d;}}" "${ori_cluster_info}" > "${mid_smart_kube_yaml}"
+        sed "0,/section-datamate-${NAMESPACE}-end/{/section-datamate-${NAMESPACE}-begin/,/section-datamate-${NAMESPACE}-end/{d;}}" "${ori_cluster_info}" > "${mid_smart_kube_yaml}"
     fi
 
     ## 更新 cluster-info-smartkube 这个 configmap

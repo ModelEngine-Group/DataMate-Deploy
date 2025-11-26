@@ -13,8 +13,8 @@ import time
 CLUSTER_INFO_SMARTKUBE = "cluster-info-smartkube"
 CLUSTER_INFO_NAMESPACE = "kube-system"
 
-SECTION_BEGIN = "# datamate-section-%s-begin"
-SECTION_END = "# datamate-section-%s-end"
+SECTION_BEGIN = "# section-datamate-%s-begin"
+SECTION_END = "# section-datamate-%s-end"
 
 LOG_PATH = "install.log"
 LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(process)d] [%(threadName)s] " \
