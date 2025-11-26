@@ -16,9 +16,8 @@ CLUSTER_INFO_NAMESPACE = "kube-system"
 SECTION_BEGIN = "# section-datamate-%s-begin"
 SECTION_END = "# section-datamate-%s-end"
 
-LOG_PATH = "install.log"
-LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(process)d] [%(threadName)s] " \
-             "[%(filename)s %(lineno)d] [%(funcName)s] %(message)s"
+LOG_PATH = "logs/install.log"
+LOG_FORMAT = "%(asctime)s [DataMate] %(levelname)-5s: [%(filename)s %(lineno)d] [%(funcName)s] %(message)s"
 
 
 def get_logger(logfile, name=None, level=logging.INFO, device='file'):

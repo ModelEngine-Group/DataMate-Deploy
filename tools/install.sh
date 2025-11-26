@@ -36,7 +36,7 @@ STORAGE_PATH=""
 REPO=""
 OPERATOR_PVC=""
 DATASET_PVC=""
-PORT=""
+PORT="30000"
 ADDRESS_TYPE="management"
 
 
@@ -207,22 +207,16 @@ function install() {
 }
 
 function add_route_to_haproxy() {
-    log_info_echo "Start config haproxy"
-    # 获取浮动IP
-    get_float_ip
+    log_info "Start config haproxy"
     # 获取 nginx service ip
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
-    if ! g_check_ip "${nginx_service_ip}"; then
-        log_error_echo "Illegal nginx_service_ip: ${nginx_service_ip}"
-        exit 1
-    fi
 
     ## 更新 oms 转发规则, 保存到 cluster_info_new.json
     if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}"; then
         log_error "add_route_to_haproxy failed"
         exit 1
     fi
-    log_info_echo "Finish config haproxy"
+    log_info "Finish config haproxy"
 }
 
 function main() {
