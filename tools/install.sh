@@ -23,6 +23,7 @@ STORAGE_CLASS_KEY="storageClass"
 STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
+MILVUS_REPO_KEY="imageRegistry"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
@@ -73,6 +74,7 @@ function read_value() {
 
   if [ -n "$REPO" ]; then
     sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
+    sed -i "s#^\(\s*${MILVUS_REPO_KEY}:\s*\).*#\1${REPO}#" "$MILVUS_VALUES_FILE"
   fi
 
   if [ -n "$OPERATOR_PVC" ]; then
