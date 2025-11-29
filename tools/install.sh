@@ -118,6 +118,7 @@ function read_storage_value() {
       sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/datamate#" "$VALUES_FILE"
       sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/milvus#" "$MILVUS_VALUES_FILE"
     else
+      mkdir -p "$STORAGE_PATH"
       STORAGE_PATH=$(realpath "$STORAGE_PATH/../")
     fi
     mkdir -p "$STORAGE_PATH/datamate"
@@ -127,6 +128,7 @@ function read_storage_value() {
     cd -  >/dev/null
 
     if [ "$INSTALL_MILVUS" == "true" ]; then
+      mkdir -p "$STORAGE_PATH/milvus"
       cd "$STORAGE_PATH/milvus"
       dirs=(etcd minio milvus milvus-log)
       create_local_path "${dirs[@]}"
