@@ -10,10 +10,8 @@
 ###   -h, --help                    help for install.
 ###
 
-NAMESPACE=datamate
+NAMESPACE=model-engine
 UNINSTALL_MILVUS=true
-
-
 
 cd "$(dirname "$0")" || exit
 WORK_DIR=$(pwd)
