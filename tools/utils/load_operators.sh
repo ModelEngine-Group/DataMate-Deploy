@@ -104,7 +104,7 @@ while read -r pkg; do
 done < <(find "$SOURCE_DIR" -maxdepth 1 -type f \( -name "*.zip" -o -name "*.tar" \))
 
 
-FULL_SQL=$(kubectl exec -i "$HEAD_POD_NAME" -- python3 - << EOF
+FULL_SQL=$(kubectl exec -i "$HEAD_POD_NAME" -n "$NAMESPACE" -- python3 - << EOF
 from pathlib import Path
 import sys, yaml
 
