@@ -58,7 +58,6 @@ fi
 
 BACKEND_POD_NAME=$(kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=datamate-backend -o jsonpath='{.items[*].metadata.name}')
 HEAD_POD_NAME=$(kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=kuberay,ray.io/node-type=head -o jsonpath='{.items[*].metadata.name}')
-VALUES=""
 
 # 3. 遍历并处理子压缩包
 # 查找目录下所有的 zip 或 tar.gz
@@ -96,11 +95,11 @@ while read -r pkg; do
 
     log_info "  -> 部署文件到容器 $BACKEND_POD_NAME:$REMOTE_PATH"
 
-#    kubectl cp "$SOURCE_DIR/$PKG_NAME" "$BACKEND_POD_NAME:$UPLOAD_DIR/"
-    kubectl cp "$PKG_EXTRACT_DIR" "$BACKEND_POD_NAME:$REMOTE_PATH/"
+#    kubectl cp "$SOURCE_DIR/$PKG_NAME" "$BACKEND_POD_NAME:$UPLOAD_DIR/" -n "$NAMESPACE"
+    kubectl cp "$PKG_EXTRACT_DIR" "$BACKEND_POD_NAME:$REMOTE_PATH/" -n "$NAMESPACE"
 
     if [ -f "$PKG_EXTRACT_DIR/wheels" ]; then
-      kubectl exec "$HEAD_POD_NAME" -- bash -c "uv pip install --target $PACKAGE_DIR /opt/runtime/datamate/ops/user/$PKG_BASE/wheels/*.whl"
+      kubectl exec "$HEAD_POD_NAME" -n "$NAMESPACE" -- bash -c "uv pip install --target $PACKAGE_DIR /opt/runtime/datamate/ops/user/$PKG_BASE/wheels/*.whl"
     fi
 done < <(find "$SOURCE_DIR" -maxdepth 1 -type f \( -name "*.zip" -o -name "*.tar" \))
 
@@ -151,6 +150,6 @@ EOF
 )
 
 DATABASE_POD_NAME=$(kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=datamate-database -o jsonpath='{.items[*].metadata.name}')
-kubectl exec -i "$DATABASE_POD_NAME" -- mysql -uroot -p"\$MYSQL_ROOT_PASSWORD" "datamate" -e "$FULL_SQL" 2>/dev/null
+kubectl exec -i "$DATABASE_POD_NAME" -n "$NAMESPACE" -- mysql -uroot -p"\$MYSQL_ROOT_PASSWORD" "datamate" -e "$FULL_SQL" 2>/dev/null
 
 log_info "所有任务执行完毕。"
