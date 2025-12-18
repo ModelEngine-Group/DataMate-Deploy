@@ -39,6 +39,7 @@ OPERATOR_PVC=""
 DATASET_PVC=""
 PORT="30000"
 ADDRESS_TYPE="management"
+PACKAGE_PATH=""
 
 
 cd "$(dirname "$0")" || exit
@@ -223,6 +224,12 @@ function add_route_to_haproxy() {
     log_info "Finish config haproxy"
 }
 
+function install_package() {
+  if [[ -n $PACKAGE_PATH ]]; then
+    bash "$UTILS_PATH/load_operators.sh" "$NAMESPACE" "$PACKAGE_PATH"
+  fi
+}
+
 function main() {
   while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -237,6 +244,7 @@ function main() {
       --skip-push) SKIP_PUSH=true; shift ;;
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
+      --package) PACKAGE_PATH="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
@@ -248,6 +256,9 @@ function main() {
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
   install
   add_route_to_haproxy
+
+  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
+  bash "$UTILS_PATH/load_images.sh"
 }
 
 main "$@"

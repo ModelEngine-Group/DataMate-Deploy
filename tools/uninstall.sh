@@ -82,6 +82,8 @@ function main() {
 
   uninstall
   remove_route_from_haproxy
+
+  kubectl wait --for=delete pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
 }
 
 main "$@"
