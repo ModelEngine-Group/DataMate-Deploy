@@ -83,7 +83,9 @@ function main() {
   uninstall
   remove_route_from_haproxy
 
+  log_info "Wait all pods terminating..."
   kubectl wait --for=delete pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
+  log_info "DataMate uninstall successfully!"
 }
 
 main "$@"

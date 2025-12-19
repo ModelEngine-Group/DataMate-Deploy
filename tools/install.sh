@@ -257,7 +257,9 @@ function main() {
   install
   add_route_to_haproxy
 
+  log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
+  log_info "DataMate install successfully!"
   install_package
 }
 
