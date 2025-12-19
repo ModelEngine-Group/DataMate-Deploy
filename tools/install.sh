@@ -258,7 +258,7 @@ function main() {
   add_route_to_haproxy
 
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
-  bash "$UTILS_PATH/load_images.sh"
+  install_package
 }
 
 main "$@"
