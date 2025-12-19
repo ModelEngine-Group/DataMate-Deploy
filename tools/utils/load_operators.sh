@@ -29,11 +29,11 @@ fi
 WORK_DIR="$current_dir/operators"
 
 # 退出时自动清理
-#cleanup() {
-#    log_info "清理临时文件..."
-#    rm -rf "$WORK_DIR"
-#}
-#trap cleanup EXIT
+cleanup() {
+   log_info "清理临时文件..."
+   rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
 
 # 2. 处理输入源（解压或复制到工作区）
 SOURCE_DIR="$WORK_DIR/source"
