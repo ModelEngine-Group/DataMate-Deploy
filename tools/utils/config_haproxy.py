@@ -8,6 +8,7 @@ import shlex
 import signal
 import subprocess
 import time
+from pathlib import Path
 
 # CONSTANTS
 CLUSTER_INFO_SMARTKUBE = "cluster-info-smartkube"
@@ -187,6 +188,10 @@ class ClusterInfoOperator(object):
             return False
         return True
 
+    def clear(self):
+        Path(self._ori_path).unlink(missing_ok=True)
+        Path(self._new_path).unlink(missing_ok=True)
+
 
 def run_shell_cmd(shell_cmd, time_out=0):
     try:
@@ -272,5 +277,6 @@ if __name__ == "__main__":
     if args.command == 'update':
         operator.update(args.namespace, args.frontend_ip, args.frontend_port, args.backend_ip, args.backend_port,
                         address_type=args.address_type)
+        operator.clear()
     else:
         print("Illegal command!")

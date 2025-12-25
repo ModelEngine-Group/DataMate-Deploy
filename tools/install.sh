@@ -27,6 +27,7 @@ MILVUS_REPO_KEY="imageRegistry"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
+INSTALL_LABEL_STUDIO=true
 
 
 # --- 脚本内部变量 ---
@@ -206,22 +207,40 @@ function install_milvus() {
   helm_install "milvus" "${HELM_PATH}/milvus"
 }
 
+function install_label_studio() {
+  helm_install "label_studio" "${HELM_PATH}/label_studio"
+}
+
 function install() {
   install_datamate
   [ "$INSTALL_MILVUS" == "true" ] && install_milvus
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && install_label_studio
 }
 
-function add_route_to_haproxy() {
+function add_nginx_route_to_haproxy() {
     log_info "Start config haproxy"
     # 获取 nginx service ip
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
-    ## 更新 oms 转发规则, 保存到 cluster_info_new.json
+    ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
     if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}"; then
-        log_error "add_route_to_haproxy failed"
+        log_error "add_nginx_route_to_haproxy failed"
         exit 1
     fi
-    log_info "Finish config haproxy"
+    log_info "Finish config nginx haproxy"
+}
+
+function add_label_studio_route_to_haproxy() {
+    log_info "Start config haproxy"
+    # 获取 label studio service ip
+    label_studio_service_ip=$(kubectl get svc label-studio -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
+
+    ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}"; then
+        log_error "add_label_studio_route_to_haproxy failed"
+        exit 1
+    fi
+    log_info "Finish config label studio haproxy"
 }
 
 function install_package() {
@@ -244,6 +263,7 @@ function main() {
       --skip-push) SKIP_PUSH=true; shift ;;
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
+      --skip-label-studio) INSTALL_LABEL_STUDIO=false; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
@@ -254,8 +274,9 @@ function main() {
   read_storage_value
   load_images "datamate"
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "milvus"
   install
-  add_route_to_haproxy
+  add_nginx_route_to_haproxy
 
   log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
