@@ -14,8 +14,8 @@ from pathlib import Path
 CLUSTER_INFO_SMARTKUBE = "cluster-info-smartkube"
 CLUSTER_INFO_NAMESPACE = "kube-system"
 
-SECTION_BEGIN = "# section-datamate-%s-begin"
-SECTION_END = "# section-datamate-%s-end"
+SECTION_BEGIN = "# section-%s-%s-begin"
+SECTION_END = "# section-%s-%s-end"
 
 LOG_PATH = "logs/install.log"
 LOG_FORMAT = "%(asctime)s [DataMate] %(levelname)-5s: [%(filename)s %(lineno)d] [%(funcName)s] %(message)s"
@@ -87,15 +87,15 @@ class ClusterInfoOperator(object):
             return None
 
     def update_haproxy_data(self, namespace, current_haproxy, front_ip, front_port, backend_ip, backend_port,
-                            address_type):
+                            address_type, module_name):
         # 将当前配置分割成行
         lines = current_haproxy.splitlines()
         updated_lines = []
         i = 0
         matched = False
 
-        section_begin = SECTION_BEGIN % namespace
-        section_end = SECTION_END % namespace
+        section_begin = SECTION_BEGIN % (module_name, namespace)
+        section_end = SECTION_END % (module_name, namespace)
 
         while i < len(lines):
             line = lines[i].rstrip()
@@ -126,13 +126,13 @@ class ClusterInfoOperator(object):
         if address_type == "management":
             updated_lines.extend([
                 f"{section_begin}",
-                f"frontend {namespace}_datamate_frontend",
+                f"frontend {namespace}_{module_name}_frontend",
                 f"    bind {front_ip}:{front_port} interface {{{{.ApisvrFrontIF}}}}",
-                f"    default_backend   {namespace}_datamate_backend",
+                f"    default_backend   {namespace}_{module_name}_backend",
                 f"    maxconn {{{{.ApisvrFrontMaxConn}}}}",
                 f"    mode tcp",
                 "",
-                f"backend {namespace}_datamate_backend",
+                f"backend {namespace}_{module_name}_backend",
                 f"    default-server inter 2s downinter 5s rise 2 fall 2 slowstart 60s maxconn 2000 maxqueue"
                 f" 200 weight 100",
                 f"    balance   roundrobin",
@@ -162,7 +162,7 @@ class ClusterInfoOperator(object):
         new_haproxy_content = '\n'.join(updated_lines)
         return new_haproxy_content
 
-    def update(self, namespace, front_ip, front_port, backend_ip, backend_port, address_type):
+    def update(self, namespace, front_ip, front_port, backend_ip, backend_port, address_type, module_name):
         if not self.dump():
             logger.error("dump cluster info failed.")
             return False
@@ -175,7 +175,7 @@ class ClusterInfoOperator(object):
 
         # 更新 haproxy 配置数据
         new_haproxy_content = self.update_haproxy_data(namespace, current_haproxy, front_ip, front_port, backend_ip,
-                                                       backend_port, address_type)
+                                                       backend_port, address_type, module_name)
 
         # 更新配置数据
         config_data['data']['haproxy'] = new_haproxy_content
@@ -267,6 +267,7 @@ def parse_args():
                                 help='nginx service port')
         parser_obj.add_argument('-a', '--address-type', dest="address_type", default="management", type=str,
                                 help='use management id or business ip')
+        parser_obj.add_argument('-m', '--module', required=False, default="datamate", type=str, help='module name')
 
     return parser.parse_args()
 

@@ -24,6 +24,7 @@ STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
 MILVUS_REPO_KEY="imageRegistry"
+LABEL_STUDIO_REPO_KEY="imageRegistry"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
@@ -50,6 +51,7 @@ UTILS_PATH="${WORK_DIR}/utils"
 HELM_PATH="$(realpath "${WORK_DIR}/../helm")"
 VALUES_FILE="$(realpath "${HELM_PATH}/datamate/values.yaml")"
 MILVUS_VALUES_FILE="$(realpath "${HELM_PATH}/milvus/values.yaml")"
+LABEL_STUDIO_VALUES_FILE="$(realpath "${HELM_PATH}/label-studio/values.yaml")"
 IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 
 . "${WORK_DIR}/utils/common.sh"
@@ -58,7 +60,7 @@ IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 function load_images() {
   local module="$1"
   if [[ "$SKIP_LOAD" == "false" ]]; then
-    log_info "Start to load images."
+    log_info "Start to load $module images."
     echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "admin" "$REPO" "$IMAGE_PATH/$module"
   fi
 }
@@ -77,6 +79,7 @@ function read_value() {
   if [ -n "$REPO" ]; then
     sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
     sed -i "s#^\(\s*${MILVUS_REPO_KEY}:\s*\).*#\1${REPO}#" "$MILVUS_VALUES_FILE"
+    [ "$INSTALL_LABEL_STUDIO" == "true" ] && sed -i "s#^\(\s*${LABEL_STUDIO_REPO_KEY}:\s*\).*#\1${REPO}#" "$LABEL_STUDIO_VALUES_FILE"
   fi
 
   if [ -n "$OPERATOR_PVC" ]; then
@@ -90,6 +93,7 @@ function read_value() {
   if [ -n "$STORAGE_CLASS" ]; then
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:\s*\).*/\1${STORAGE_CLASS}/" "$VALUES_FILE"
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$MILVUS_VALUES_FILE"
+    [ "$INSTALL_LABEL_STUDIO" == "true" ] && sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$LABEL_STUDIO_VALUES_FILE"
   else
     STORAGE_CLASS=$(grep -oP "(?<=$STORAGE_CLASS_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
@@ -208,7 +212,7 @@ function install_milvus() {
 }
 
 function install_label_studio() {
-  helm_install "label_studio" "${HELM_PATH}/label_studio"
+  helm_install "label-studio" "${HELM_PATH}/label-studio"
 }
 
 function install() {
@@ -218,7 +222,7 @@ function install() {
 }
 
 function add_nginx_route_to_haproxy() {
-    log_info "Start config haproxy"
+    log_info "Start config nginx haproxy"
     # 获取 nginx service ip
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
@@ -231,7 +235,7 @@ function add_nginx_route_to_haproxy() {
 }
 
 function add_label_studio_route_to_haproxy() {
-    log_info "Start config haproxy"
+    log_info "Start config label studio haproxy"
     # 获取 label studio service ip
     label_studio_service_ip=$(kubectl get svc label-studio -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
@@ -274,9 +278,10 @@ function main() {
   read_storage_value
   load_images "datamate"
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
-  [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "milvus"
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "label-studio"
   install
   add_nginx_route_to_haproxy
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
 
   log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
