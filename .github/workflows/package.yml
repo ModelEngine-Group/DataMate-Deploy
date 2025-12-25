@@ -95,7 +95,7 @@ jobs:
             docker pull ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest --platform arm64
             docker tag ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:${{ inputs.version }}
             docker save -o images/deer-flow/deer-flow-$service.tar deer-flow-$service:${{ inputs.version }}
-            docekr rmi ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:${{ inputs.version }}
+            docker rmi ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:${{ inputs.version }}
           done
 
       - name: Download Milvus Image
@@ -120,7 +120,7 @@ jobs:
           docker pull ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest --platform arm64
           docker tag ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker save -o images/label-studio/datamate-label-studio.tar datamate-label-studio:${{ inputs.version }}
-          docekr rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
+          docker rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker pull pgautoupgrade/pgautoupgrade:13-alpine --platform arm64
           docker save -o images/label-studio/pgautoupgrade.tar pgautoupgrade/pgautoupgrade:13-alpine
           docker rmi pgautoupgrade/pgautoupgrade:13-alpine
