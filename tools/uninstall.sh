@@ -12,6 +12,7 @@
 
 NAMESPACE=model-engine
 UNINSTALL_MILVUS=true
+UNINSTALL_LABEL_STUDIO=true
 
 cd "$(dirname "$0")" || exit
 WORK_DIR=$(pwd)
@@ -46,13 +47,38 @@ function uninstall_milvus() {
   helm_uninstall "milvus"
 }
 
+function uninstall_label_studio() {
+  helm_uninstall "label-studio"
+}
+
 function uninstall() {
   uninstall_datamate
   [ "$UNINSTALL_MILVUS" == "true" ] && uninstall_milvus
+  [ "$UNINSTALL_LABEL_STUDIO" == "true" ] && uninstall_label_studio
 }
 
 function remove_route_from_haproxy() {
     log_info "Remove datamate route from haproxy"
+
+    local ori_cluster_info="${WORK_DIR}"/smartkube.yaml
+    local mid_smart_kube_yaml="${WORK_DIR}"/smartkube.yaml.mid
+    ## 将 cluster-info-smartkube 这个 configmap 保存到文件
+    kubectl get cm cluster-info-smartkube -n kube-system -o yaml > "${ori_cluster_info}"
+    cp -fH --remove-destination "${ori_cluster_info}" "${mid_smart_kube_yaml}"
+
+    ## 删除原来的配置
+    if grep -B 10000 'kind: ConfigMap' "${ori_cluster_info}" | grep 'section' >/dev/null 2>&1; then
+        sed "0,/section-datamate-${NAMESPACE}-end/{/section-datamate-${NAMESPACE}-begin/,/section-datamate-${NAMESPACE}-end/{d;}}" "${ori_cluster_info}" > "${mid_smart_kube_yaml}"
+    fi
+
+    ## 更新 cluster-info-smartkube 这个 configmap
+    kubectl replace -f "${mid_smart_kube_yaml}"
+
+    log_info "Finish remove datamate route from haproxy"
+}
+
+function remove_label_studio_route_from_haproxy() {
+    log_info "Remove label studio route from haproxy"
 
     local ori_cluster_info="${WORK_DIR}"/smartkube.yaml
     local mid_smart_kube_yaml="${WORK_DIR}"/smartkube.yaml.mid

@@ -24,9 +24,11 @@ STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
 MILVUS_REPO_KEY="imageRegistry"
+LABEL_STUDIO_REPO_KEY="imageRegistry"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
+INSTALL_LABEL_STUDIO=true
 
 
 # --- 脚本内部变量 ---
@@ -49,6 +51,7 @@ UTILS_PATH="${WORK_DIR}/utils"
 HELM_PATH="$(realpath "${WORK_DIR}/../helm")"
 VALUES_FILE="$(realpath "${HELM_PATH}/datamate/values.yaml")"
 MILVUS_VALUES_FILE="$(realpath "${HELM_PATH}/milvus/values.yaml")"
+LABEL_STUDIO_VALUES_FILE="$(realpath "${HELM_PATH}/label-studio/values.yaml")"
 IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 
 . "${WORK_DIR}/utils/common.sh"
@@ -57,7 +60,7 @@ IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 function load_images() {
   local module="$1"
   if [[ "$SKIP_LOAD" == "false" ]]; then
-    log_info "Start to load images."
+    log_info "Start to load $module images."
     echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "admin" "$REPO" "$IMAGE_PATH/$module"
   fi
 }
@@ -76,6 +79,7 @@ function read_value() {
   if [ -n "$REPO" ]; then
     sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
     sed -i "s#^\(\s*${MILVUS_REPO_KEY}:\s*\).*#\1${REPO}#" "$MILVUS_VALUES_FILE"
+    [ "$INSTALL_LABEL_STUDIO" == "true" ] && sed -i "s#^\(\s*${LABEL_STUDIO_REPO_KEY}:\s*\).*#\1${REPO}#" "$LABEL_STUDIO_VALUES_FILE"
   fi
 
   if [ -n "$OPERATOR_PVC" ]; then
@@ -89,6 +93,7 @@ function read_value() {
   if [ -n "$STORAGE_CLASS" ]; then
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:\s*\).*/\1${STORAGE_CLASS}/" "$VALUES_FILE"
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$MILVUS_VALUES_FILE"
+    [ "$INSTALL_LABEL_STUDIO" == "true" ] && sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$LABEL_STUDIO_VALUES_FILE"
   else
     STORAGE_CLASS=$(grep -oP "(?<=$STORAGE_CLASS_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
@@ -206,22 +211,40 @@ function install_milvus() {
   helm_install "milvus" "${HELM_PATH}/milvus"
 }
 
+function install_label_studio() {
+  helm_install "label-studio" "${HELM_PATH}/label-studio"
+}
+
 function install() {
   install_datamate
   [ "$INSTALL_MILVUS" == "true" ] && install_milvus
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && install_label_studio
 }
 
-function add_route_to_haproxy() {
-    log_info "Start config haproxy"
+function add_nginx_route_to_haproxy() {
+    log_info "Start config nginx haproxy"
     # 获取 nginx service ip
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
-    ## 更新 oms 转发规则, 保存到 cluster_info_new.json
+    ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
     if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}"; then
-        log_error "add_route_to_haproxy failed"
+        log_error "add_nginx_route_to_haproxy failed"
         exit 1
     fi
-    log_info "Finish config haproxy"
+    log_info "Finish config nginx haproxy"
+}
+
+function add_label_studio_route_to_haproxy() {
+    log_info "Start config label studio haproxy"
+    # 获取 label studio service ip
+    label_studio_service_ip=$(kubectl get svc label-studio -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
+
+    ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}"; then
+        log_error "add_label_studio_route_to_haproxy failed"
+        exit 1
+    fi
+    log_info "Finish config label studio haproxy"
 }
 
 function install_package() {
@@ -244,6 +267,7 @@ function main() {
       --skip-push) SKIP_PUSH=true; shift ;;
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
+      --skip-label-studio) INSTALL_LABEL_STUDIO=false; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
@@ -254,8 +278,10 @@ function main() {
   read_storage_value
   load_images "datamate"
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "label-studio"
   install
-  add_route_to_haproxy
+  add_nginx_route_to_haproxy
+  [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
 
   log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
