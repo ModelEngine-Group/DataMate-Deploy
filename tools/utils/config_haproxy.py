@@ -277,7 +277,7 @@ if __name__ == "__main__":
     operator = ClusterInfoOperator()
     if args.command == 'update':
         operator.update(args.namespace, args.frontend_ip, args.frontend_port, args.backend_ip, args.backend_port,
-                        address_type=args.address_type)
+                        address_type=args.address_type, module_name=args.module)
         operator.clear()
     else:
         print("Illegal command!")
