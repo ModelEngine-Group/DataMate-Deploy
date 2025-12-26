@@ -73,6 +73,7 @@ function remove_route_from_haproxy() {
 
     ## 更新 cluster-info-smartkube 这个 configmap
     kubectl replace -f "${mid_smart_kube_yaml}"
+    rm -f "${mid_smart_kube_yaml}"
 
     log_info "Finish remove datamate route from haproxy"
 }
@@ -88,11 +89,12 @@ function remove_label_studio_route_from_haproxy() {
 
     ## 删除原来的配置
     if grep -B 10000 'kind: ConfigMap' "${ori_cluster_info}" | grep 'section' >/dev/null 2>&1; then
-        sed "0,/section-datamate-${NAMESPACE}-end/{/section-datamate-${NAMESPACE}-begin/,/section-datamate-${NAMESPACE}-end/{d;}}" "${ori_cluster_info}" > "${mid_smart_kube_yaml}"
+        sed "0,/section-label-studio-${NAMESPACE}-end/{/section-label-studio-${NAMESPACE}-begin/,/section-label-studio-${NAMESPACE}-end/{d;}}" "${ori_cluster_info}" > "${mid_smart_kube_yaml}"
     fi
 
     ## 更新 cluster-info-smartkube 这个 configmap
     kubectl replace -f "${mid_smart_kube_yaml}"
+    rm -f "${mid_smart_kube_yaml}"
 
     log_info "Finish remove datamate route from haproxy"
 }
@@ -108,6 +110,7 @@ function main() {
 
   uninstall
   remove_route_from_haproxy
+  [ "$UNINSTALL_LABEL_STUDIO" == "true" ] && remove_label_studio_route_from_haproxy
 
   log_info "Wait all pods terminating..."
   kubectl wait --for=delete pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
