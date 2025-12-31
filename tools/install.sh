@@ -12,8 +12,6 @@
 ###       --skip-push                 Skip push images.
 ###   -h, --help                      Show this help message
 
-set -e
-
 DEFAULT_NAMESPACE="model-engine"
 DEFAULT_STORAGE_CLASS="sc-system-manage"
 NAMESPACE_KEY="namespace"
@@ -135,17 +133,17 @@ function read_storage_value() {
       STORAGE_PATH=$(realpath "$STORAGE_PATH/../")
     fi
     mkdir -p "$STORAGE_PATH/datamate"
-    cd "$STORAGE_PATH/datamate"
+    cd "$STORAGE_PATH/datamate" || exit
     dirs=(dataset flow database operator log)
     create_local_path "${dirs[@]}"
-    cd -  >/dev/null
+    cd -  >/dev/null || exit
 
     if [ "$INSTALL_MILVUS" == "true" ]; then
       mkdir -p "$STORAGE_PATH/milvus"
-      cd "$STORAGE_PATH/milvus"
+      cd "$STORAGE_PATH/milvus" || exit
       dirs=(etcd minio milvus milvus-log)
       create_local_path "${dirs[@]}"
-      cd -  >/dev/null
+      cd -  >/dev/null || exit
     fi
   fi
 }
@@ -176,7 +174,7 @@ function create_local_path() {
           ;;
         [nN][oO]|[nN])
           log_info "Please manually clear the local directory $STORAGE_PATH or use another directory. The script stops running."
-          cd -
+          cd - || exit
           exit 1
           ;;
         *)
@@ -234,7 +232,7 @@ function add_nginx_route_to_haproxy() {
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -m "datamate"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -m "datamate"; then
         log_error "Add nginx route to haproxy failed"
         exit 1
     fi
@@ -247,7 +245,7 @@ function add_label_studio_route_to_haproxy() {
     label_studio_service_ip=$(kubectl get svc label-studio -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio"; then
         log_error "Add label studio route to haproxy failed"
         exit 1
     fi
@@ -275,7 +273,7 @@ function main() {
       --skip-push) SKIP_PUSH=true; shift ;;
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
-      --skip-label-studio) INSTALL_LABEL_STUDIO=false; shift ;;
+      --skip-label-studio|--skip-ls) INSTALL_LABEL_STUDIO=false; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
       --nodeport) NODE_PORT="$2"; shift 2 ;;
