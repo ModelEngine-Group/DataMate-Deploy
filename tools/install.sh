@@ -23,12 +23,14 @@ STORAGE_CLASS_KEY="storageClass"
 STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
+REPO_USER="admin"
 MILVUS_REPO_KEY="imageRegistry"
 LABEL_STUDIO_REPO_KEY="imageRegistry"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
 INSTALL_LABEL_STUDIO=true
+EXECUTE_HAPROXY=true
 
 
 # --- 脚本内部变量 ---
@@ -40,6 +42,7 @@ REPO=""
 OPERATOR_PVC=""
 DATASET_PVC=""
 PORT="30000"
+NODE_PORT=""
 ADDRESS_TYPE="management"
 PACKAGE_PATH=""
 
@@ -61,13 +64,12 @@ function load_images() {
   local module="$1"
   if [[ "$SKIP_LOAD" == "false" ]]; then
     log_info "Start to load $module images."
-    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "admin" "$REPO" "$IMAGE_PATH/$module"
+    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "$REPO_USER" "$REPO" "$IMAGE_PATH/$module"
   fi
 }
 
 function read_value() {
   if [[ ${SKIP_LOAD} == "false" && ${SKIP_PUSH} == "false" ]]; then
-#    read -p "Enter your registry user: " -rs registry_user
     read -p "Enter your registry password: " -rs registry_password
     echo ""
   fi
@@ -106,6 +108,11 @@ function read_value() {
     fi
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$VALUES_FILE"
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$MILVUS_VALUES_FILE"
+  fi
+
+  if [ -n "$NODE_PORT" ]; then
+    sed -i "s/type: ClusterIP/type: NodePort/g" "$VALUES_FILE"
+    sed -i "s/^\(\s*nodePort:\s*\).*/\1${NODE_PORT}/" "$VALUES_FILE"
   fi
 }
 
@@ -260,6 +267,7 @@ function main() {
       -n|--ns|--namespace) NAMESPACE="$2"; shift 2 ;;
       --sc|--storage-class) STORAGE_CLASS="$2"; shift 2 ;;
       --repo) REPO="${2%/}/"; shift 2 ;;
+      --repo-user) REPO_USER="$2"; shift 2 ;;
       --operator) OPERATOR_PVC="$2"; shift 2 ;;
       --path) STORAGE_PATH="$2"; shift 2 ;;
       --port) PORT="$2"; shift 2 ;;
@@ -269,6 +277,8 @@ function main() {
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
       --skip-label-studio) INSTALL_LABEL_STUDIO=false; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
+      --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
+      --nodeport) NODE_PORT="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
@@ -280,8 +290,8 @@ function main() {
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
   [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "label-studio"
   install
-  add_nginx_route_to_haproxy
-  [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
+  [ "$EXECUTE_HAPROXY" == "true" ] && add_nginx_route_to_haproxy
+  [ "$EXECUTE_HAPROXY" == "true" ] && [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
 
   log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
