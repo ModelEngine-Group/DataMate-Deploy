@@ -124,6 +124,8 @@ class ClusterInfoOperator(object):
         # 添加新配置到文件末尾
         logger.info(f'在文件末尾添加新的配置')
         if address_type == "management":
+            if front_ip is None:
+                front_ip = '{{.ApisvrFrontVIP}}'
             updated_lines.extend([
                 f"{section_begin}",
                 f"frontend {namespace}_{module_name}_frontend",
@@ -141,6 +143,8 @@ class ClusterInfoOperator(object):
                 f"{section_end}",
             ])
         else:
+            if front_ip is None:
+                front_ip = '{{.TraefikFrontVIP}}'
             updated_lines.extend([
                 f"{section_begin}",
                 f"frontend {namespace}_datamate_frontend",
@@ -259,7 +263,8 @@ def parse_args():
                                                          '# datamate-rule-<namespace>-end ')
     for parser_obj in (parser_update,):
         parser_obj.add_argument('-n', '--namespace', required=True, help='Namespace to add the rule in')
-        parser_obj.add_argument('-f', '--frontend-ip', dest="frontend_ip", required=True, help='Frontend ip')
+        parser_obj.add_argument('-f', '--frontend-ip', dest="frontend_ip", required=False, default=None,
+                                help='Frontend ip')
         parser_obj.add_argument('-p', '--frontend-port', dest="frontend_port", required=True, type=int,
                                 help='Frontend port')
         parser_obj.add_argument('-b', '--backend-ip', dest="backend_ip", required=True, help='nginx service ip')

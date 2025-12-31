@@ -13,6 +13,7 @@
 NAMESPACE=model-engine
 UNINSTALL_MILVUS=true
 UNINSTALL_LABEL_STUDIO=true
+EXECUTE_HAPROXY=true
 
 cd "$(dirname "$0")" || exit
 WORK_DIR=$(pwd)
@@ -103,14 +104,16 @@ function main() {
   while [[ "$#" -gt 0 ]]; do
     case $1 in
       -n|--ns|--namespace) NAMESPACE="$2"; shift 2 ;;
+      --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
+      --skip-label-studio|--skip-ls) UNINSTALL_LABEL_STUDIO=false; shift ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
   done
 
   uninstall
-  remove_route_from_haproxy
-  [ "$UNINSTALL_LABEL_STUDIO" == "true" ] && remove_label_studio_route_from_haproxy
+  [ "$EXECUTE_HAPROXY" == "true" ] && remove_route_from_haproxy
+  [ "$EXECUTE_HAPROXY" == "true" ] && [ "$UNINSTALL_LABEL_STUDIO" == "true" ] && remove_label_studio_route_from_haproxy
 
   log_info "Wait all pods terminating..."
   kubectl wait --for=delete pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null

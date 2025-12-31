@@ -2,17 +2,23 @@
 ### This is a script for deploying Helm Charts, supporting image pushing and dynamic PVC configuration.
 ###
 ### Flags:
-###   -n, --ns, --namespace <ns>      Target Kubernetes namespace for deployment.
+###       --address-type <type>       Specify the address type (e.g., ip, domain).
 ###       --dataset <size>            Specify the capacity of the dataset pvc.
+###   -n, --ns, --namespace <ns>      Target Kubernetes namespace for deployment.
+###       --node-port <port>           Specify the NodePort for external access.
 ###       --operator <size>           Specify the capacity of the operator pvc.
-###       --path <path>               Specify the node of the local pvc.
+###       --package <path>            Specify the file path of the deployment package.
+###       --path <path>               Specify the host path for local storage.
+###       --port <port>               Specify the service port.
 ###       --repo <url>                Specify the image repository url.
+###       --repo-user <user>          Specify the username for the image repository.
 ###       --sc, --storage-class <sc>  Specify the storage class name.
-###       --skip-load                 Skip load images. Images will still be imported.
-###       --skip-push                 Skip push images.
-###   -h, --help                      Show this help message
-
-set -e
+###       --skip-haproxy              Skip HAProxy configuration.
+###       --skip-label-studio         Skip Label Studio installation.
+###       --skip-load                 Skip loading images.
+###       --skip-milvus               Skip Milvus installation.
+###       --skip-push                 Skip pushing images.
+###   -h, --help                      Show this help message.
 
 DEFAULT_NAMESPACE="model-engine"
 DEFAULT_STORAGE_CLASS="sc-system-manage"
@@ -23,12 +29,14 @@ STORAGE_CLASS_KEY="storageClass"
 STORAGE_NODE_KEY="storageNode"
 STORAGE_PATH_KEY="storagePath"
 REPO_KEY="repository"
+REPO_USER="admin"
 MILVUS_REPO_KEY="imageRegistry"
 LABEL_STUDIO_REPO_KEY="imageRegistry"
 SKIP_PUSH=false
 SKIP_LOAD=false
 INSTALL_MILVUS=true
 INSTALL_LABEL_STUDIO=true
+EXECUTE_HAPROXY=true
 
 
 # --- 脚本内部变量 ---
@@ -40,6 +48,7 @@ REPO=""
 OPERATOR_PVC=""
 DATASET_PVC=""
 PORT="30000"
+NODE_PORT=""
 ADDRESS_TYPE="management"
 PACKAGE_PATH=""
 
@@ -61,13 +70,12 @@ function load_images() {
   local module="$1"
   if [[ "$SKIP_LOAD" == "false" ]]; then
     log_info "Start to load $module images."
-    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "admin" "$REPO" "$IMAGE_PATH/$module"
+    echo "$registry_password" | bash "$UTILS_PATH/load_images.sh" "$SKIP_PUSH" "$REPO_USER" "$REPO" "$IMAGE_PATH/$module"
   fi
 }
 
 function read_value() {
   if [[ ${SKIP_LOAD} == "false" && ${SKIP_PUSH} == "false" ]]; then
-#    read -p "Enter your registry user: " -rs registry_user
     read -p "Enter your registry password: " -rs registry_password
     echo ""
   fi
@@ -107,6 +115,11 @@ function read_value() {
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$VALUES_FILE"
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$MILVUS_VALUES_FILE"
   fi
+
+  if [ -n "$NODE_PORT" ]; then
+    sed -i "s/type: ClusterIP/type: NodePort/g" "$VALUES_FILE"
+    sed -i "s/^\(\s*nodePort:\s*\).*/\1${NODE_PORT}/" "$VALUES_FILE"
+  fi
 }
 
 function read_storage_value() {
@@ -128,17 +141,17 @@ function read_storage_value() {
       STORAGE_PATH=$(realpath "$STORAGE_PATH/../")
     fi
     mkdir -p "$STORAGE_PATH/datamate"
-    cd "$STORAGE_PATH/datamate"
+    cd "$STORAGE_PATH/datamate" || exit
     dirs=(dataset flow database operator log)
     create_local_path "${dirs[@]}"
-    cd -  >/dev/null
+    cd -  >/dev/null || exit
 
     if [ "$INSTALL_MILVUS" == "true" ]; then
       mkdir -p "$STORAGE_PATH/milvus"
-      cd "$STORAGE_PATH/milvus"
+      cd "$STORAGE_PATH/milvus" || exit
       dirs=(etcd minio milvus milvus-log)
       create_local_path "${dirs[@]}"
-      cd -  >/dev/null
+      cd -  >/dev/null || exit
     fi
   fi
 }
@@ -169,7 +182,7 @@ function create_local_path() {
           ;;
         [nN][oO]|[nN])
           log_info "Please manually clear the local directory $STORAGE_PATH or use another directory. The script stops running."
-          cd -
+          cd - || exit
           exit 1
           ;;
         *)
@@ -227,7 +240,7 @@ function add_nginx_route_to_haproxy() {
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -m "datamate"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -m "datamate"; then
         log_error "Add nginx route to haproxy failed"
         exit 1
     fi
@@ -240,7 +253,7 @@ function add_label_studio_route_to_haproxy() {
     label_studio_service_ip=$(kubectl get svc label-studio -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -f "{{.ApisvrFrontVIP}}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio"; then
         log_error "Add label studio route to haproxy failed"
         exit 1
     fi
@@ -260,6 +273,7 @@ function main() {
       -n|--ns|--namespace) NAMESPACE="$2"; shift 2 ;;
       --sc|--storage-class) STORAGE_CLASS="$2"; shift 2 ;;
       --repo) REPO="${2%/}/"; shift 2 ;;
+      --repo-user) REPO_USER="$2"; shift 2 ;;
       --operator) OPERATOR_PVC="$2"; shift 2 ;;
       --path) STORAGE_PATH="$2"; shift 2 ;;
       --port) PORT="$2"; shift 2 ;;
@@ -267,8 +281,10 @@ function main() {
       --skip-push) SKIP_PUSH=true; shift ;;
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
-      --skip-label-studio) INSTALL_LABEL_STUDIO=false; shift ;;
+      --skip-label-studio|--skip-ls) INSTALL_LABEL_STUDIO=false; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
+      --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
+      --node-port) NODE_PORT="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
@@ -280,8 +296,8 @@ function main() {
   [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
   [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "label-studio"
   install
-  add_nginx_route_to_haproxy
-  [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
+  [ "$EXECUTE_HAPROXY" == "true" ] && add_nginx_route_to_haproxy
+  [ "$EXECUTE_HAPROXY" == "true" ] && [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
 
   log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null

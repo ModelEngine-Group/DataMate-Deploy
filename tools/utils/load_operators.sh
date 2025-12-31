@@ -6,7 +6,6 @@ current_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # ================= 配置区域 =================
 # 目标路径
-UPLOAD_DIR="/operators/upload"
 EXTRACT_DIR="/operators/extract"
 PACKAGE_DIR="/usr/local/lib/ops/site-packages"
 
@@ -107,13 +106,12 @@ while read -r pkg; do
     fi
 done < <(find "$SOURCE_DIR" -maxdepth 1 -type f \( -name "*.zip" -o -name "*.tar" \))
 
-
-FULL_SQL=$(kubectl exec -i "$HEAD_POD_NAME" -n "$NAMESPACE" -c ray-head -- python3 - << EOF
+read -r -d '' PY_SCRIPT << 'EOF'
 from pathlib import Path
-import json, sys, yaml
+import json, sys, yaml, base64
 
 operator_sql = 'INSERT IGNORE INTO t_operator (id, name, description, version, inputs, outputs, runtime, settings, file_name, is_star) VALUES '
-category_sql='INSERT IGNORE INTO t_operator_category_relation(category_id, operator_id) VALUES '
+category_sql = 'INSERT IGNORE INTO t_operator_category_relation(category_id, operator_id) VALUES '
 modal_map = {
     'text': 'd8a5df7a-52a9-42c2-83c4-01062e60f597',
     'image': 'de36b61c-9e8a-4422-8c31-d30585c7100f',
@@ -131,14 +129,15 @@ for metadata_file in base_path.rglob('metadata.yml'):
     try:
         with open(metadata_file, 'r') as f:
             data = yaml.safe_load(f)
-            id = data.get('raw_id').strip("'\"")
-            name = data.get('name').strip("'\"")
-            desc = data.get('description').strip("'\"")
-            version = data.get('version').strip("'\"")
-            modal = data.get('modal').lower().strip("'\"")
-            language = data.get('language').lower().strip("'\"")
-            inputs = data.get('inputs').strip("'\"")
-            outputs = data.get('outputs').strip("'\"")
+            id = data.get('raw_id', '').strip("'\"")
+            name = data.get('name', '').strip("'\"")
+            desc = data.get('description', '').strip("'\"")
+            version = data.get('version', '').strip("'\"")
+            modal = data.get('modal', '').lower().strip("'\"")
+            language = data.get('language', '').lower().strip("'\"")
+            inputs = data.get('inputs', '').strip("'\"")
+            outputs = data.get('outputs', '').strip("'\"")
+
             runtime = f"'{json.dumps(data.get('runtime'), ensure_ascii=False)}'" if 'runtime' in data else 'null'
             settings = f"'{json.dumps(data.get('settings'), ensure_ascii=False)}'" if 'settings' in data else 'null'
             file_name = Path(metadata_file).parent.name
@@ -147,12 +146,15 @@ for metadata_file in base_path.rglob('metadata.yml'):
             category_sql += "('{}', '{}'),".format(modal_map.get(modal, 'd8a5df7a-52a9-42c2-83c4-01062e60f597'), id)
             category_sql += "('{}', '{}'),".format(language_map.get(language, '9eda9d5d-072b-499b-916c-797a0a8750e1'), id)
             category_sql += "('ec2cdd17-8b93-4a81-88c4-ac9e98d10757', '{}'),".format(id)
+            category_sql += "('f00eaa3e-96c1-4de4-96cd-9848ef5429ec', '{}'),".format(id)
     except Exception as e:
         print(f'ERROR: {e}', file=sys.stderr)
         sys.exit(1)
-    print(operator_sql[:-1] + ';\n' + category_sql[:-1] + ';')
+print(operator_sql[:-1] + ';\n' + category_sql[:-1] + ';')
 EOF
-)
+
+B64_CODE=$(python3 -c "import base64, sys; print(base64.b64encode(sys.stdin.read().encode('utf-8')).decode('utf-8'))" <<< "$PY_SCRIPT")
+FULL_SQL=$(kubectl exec -i "$HEAD_POD_NAME" -n "$NAMESPACE" -c ray-head -- /bin/sh -c "echo '$B64_CODE' | base64 -d | python3 -")
 
 log_info "插入数据库..."
 DATABASE_POD_NAME=$(kubectl get pod -n "$NAMESPACE" -l app.kubernetes.io/name=datamate-database -o jsonpath='{.items[*].metadata.name}')
