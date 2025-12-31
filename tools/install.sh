@@ -2,15 +2,23 @@
 ### This is a script for deploying Helm Charts, supporting image pushing and dynamic PVC configuration.
 ###
 ### Flags:
-###   -n, --ns, --namespace <ns>      Target Kubernetes namespace for deployment.
+###       --address-type <type>       Specify the address type (e.g., ip, domain).
 ###       --dataset <size>            Specify the capacity of the dataset pvc.
+###   -n, --ns, --namespace <ns>      Target Kubernetes namespace for deployment.
+###       --node-port <port>           Specify the NodePort for external access.
 ###       --operator <size>           Specify the capacity of the operator pvc.
-###       --path <path>               Specify the node of the local pvc.
+###       --package <path>            Specify the file path of the deployment package.
+###       --path <path>               Specify the host path for local storage.
+###       --port <port>               Specify the service port.
 ###       --repo <url>                Specify the image repository url.
+###       --repo-user <user>          Specify the username for the image repository.
 ###       --sc, --storage-class <sc>  Specify the storage class name.
-###       --skip-load                 Skip load images. Images will still be imported.
-###       --skip-push                 Skip push images.
-###   -h, --help                      Show this help message
+###       --skip-haproxy              Skip HAProxy configuration.
+###       --skip-label-studio         Skip Label Studio installation.
+###       --skip-load                 Skip loading images.
+###       --skip-milvus               Skip Milvus installation.
+###       --skip-push                 Skip pushing images.
+###   -h, --help                      Show this help message.
 
 DEFAULT_NAMESPACE="model-engine"
 DEFAULT_STORAGE_CLASS="sc-system-manage"
@@ -276,7 +284,7 @@ function main() {
       --skip-label-studio|--skip-ls) INSTALL_LABEL_STUDIO=false; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
-      --nodeport) NODE_PORT="$2"; shift 2 ;;
+      --node-port) NODE_PORT="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
