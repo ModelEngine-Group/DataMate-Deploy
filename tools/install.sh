@@ -20,6 +20,8 @@
 ###       --skip-push                 Skip pushing images.
 ###   -h, --help                      Show this help message.
 
+set -e
+
 DEFAULT_NAMESPACE="model-engine"
 DEFAULT_STORAGE_CLASS="sc-system-manage"
 NAMESPACE_KEY="namespace"
@@ -87,7 +89,9 @@ function read_value() {
   if [ -n "$REPO" ]; then
     sed -i "s#^\(\s*${REPO_KEY}:\s*\).*#\1${REPO}#" "$VALUES_FILE"
     sed -i "s#^\(\s*${MILVUS_REPO_KEY}:\s*\).*#\1${REPO}#" "$MILVUS_VALUES_FILE"
-    [ "$INSTALL_LABEL_STUDIO" == "true" ] && sed -i "s#^\(\s*${LABEL_STUDIO_REPO_KEY}:\s*\).*#\1${REPO}#" "$LABEL_STUDIO_VALUES_FILE"
+    if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+      sed -i "s#^\(\s*${LABEL_STUDIO_REPO_KEY}:\s*\).*#\1${REPO}#" "$LABEL_STUDIO_VALUES_FILE"
+    fi
   fi
 
   if [ -n "$OPERATOR_PVC" ]; then
@@ -101,7 +105,9 @@ function read_value() {
   if [ -n "$STORAGE_CLASS" ]; then
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:\s*\).*/\1${STORAGE_CLASS}/" "$VALUES_FILE"
     sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$MILVUS_VALUES_FILE"
-    [ "$INSTALL_LABEL_STUDIO" == "true" ] && sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$LABEL_STUDIO_VALUES_FILE"
+    if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+      sed -i "s/^\(\s*${STORAGE_CLASS_KEY}:*\).*/\1 ${STORAGE_CLASS}/" "$LABEL_STUDIO_VALUES_FILE"
+    fi
   else
     STORAGE_CLASS=$(grep -oP "(?<=$STORAGE_CLASS_KEY: ).*" "$VALUES_FILE" | tr -d '"\r')
   fi
@@ -230,8 +236,12 @@ function install_label_studio() {
 
 function install() {
   install_datamate
-  [ "$INSTALL_MILVUS" == "true" ] && install_milvus
-  [ "$INSTALL_LABEL_STUDIO" == "true" ] && install_label_studio
+  if [ "$INSTALL_MILVUS" == "true" ]; then
+    install_milvus
+  fi
+  if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+    install_label_studio
+  fi
 }
 
 function add_nginx_route_to_haproxy() {
@@ -293,11 +303,21 @@ function main() {
   read_value
   read_storage_value
   load_images "datamate"
-  [ "$INSTALL_MILVUS" == "true" ] && load_images "milvus"
-  [ "$INSTALL_LABEL_STUDIO" == "true" ] && load_images "label-studio"
+  if [ "$INSTALL_MILVUS" == "true" ]; then
+    load_images "milvus"
+  fi
+  if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+    load_images "label-studio"
+  fi
+
   install
-  [ "$EXECUTE_HAPROXY" == "true" ] && add_nginx_route_to_haproxy
-  [ "$EXECUTE_HAPROXY" == "true" ] && [ "$INSTALL_LABEL_STUDIO" == "true" ] && add_label_studio_route_to_haproxy
+
+  if [ "$EXECUTE_HAPROXY" == "true" ]; then
+    add_nginx_route_to_haproxy
+    if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+      add_label_studio_route_to_haproxy
+    fi
+  fi
 
   log_info "Wait all pods ready..."
   kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=datamate -n "$NAMESPACE" --timeout=300s >/dev/null
