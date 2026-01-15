@@ -41,9 +41,8 @@ jobs:
       - name: DataMate Package
         run: |
           set +e
-          du -h -d 1 /usr
-          ls -la /mnt
-          du -h -d 1 /opt
+          df -h .
+          ls -la
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
           sed -i "s#^\(\s*repository:\s*\).*#\1\"\"#" helm/datamate/values.yaml
