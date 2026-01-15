@@ -203,6 +203,20 @@ function create_local_path() {
   done
 }
 
+function get_cert_pass() {
+    local POD_NAME
+    POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l app=oms --no-headers | awk '{print $1}')
+
+    if [ -z "$POD_NAME" ]; then
+        return
+    else
+        cert_pass=$(kubectl exec -i -n "$NAMESPACE" "$POD_NAME" -- bash -c \
+          'source /opt/huawei/fce/runtime/common/kmc_encrypt_decrypt_tool.sh &&
+          kmc_decrypt $(grep "^nginx=" /opt/huawei/fce/security/priv/nginx.conf | cut -d "=" -f 2-) nginx')
+        sed -i "s#CERT_PASS:.*#CERT_PASS: $cert_pass#" "$VALUES_FILE"
+    fi
+}
+
 function helm_install() {
   local release_name="$1"
   local chart_path="$2"
@@ -302,6 +316,7 @@ function main() {
 
   read_value
   read_storage_value
+  get_cert_pass
   load_images "datamate"
   if [ "$INSTALL_MILVUS" == "true" ]; then
     load_images "milvus"
