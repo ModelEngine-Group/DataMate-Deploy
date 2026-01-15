@@ -41,7 +41,9 @@ jobs:
       - name: DataMate Package
         run: |
           set +e
+          df -h
           df -h .
+          pwd
           ls -la
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
