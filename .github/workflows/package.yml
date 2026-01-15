@@ -40,8 +40,9 @@ jobs:
 
       - name: DataMate Package
         run: |
+          set +e
           du -h -d 1 /usr
-          du -h -d 1 /mnt
+          ls -la /mnt
           du -h -d 1 /opt
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
