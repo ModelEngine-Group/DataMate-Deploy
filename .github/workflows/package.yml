@@ -45,6 +45,8 @@ jobs:
           df -h .
           pwd
           ls -la
+          ls -lh /usr/local/lib/android
+          ls -lh /usr/share/dotnet
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
           sed -i "s#^\(\s*repository:\s*\).*#\1\"\"#" helm/datamate/values.yaml
