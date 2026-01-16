@@ -212,8 +212,8 @@ function get_cert_pass() {
     else
         cert_pass=$(kubectl exec -i -n "$NAMESPACE" "$POD_NAME" -- bash -c \
           'source /opt/huawei/fce/runtime/common/kmc_encrypt_decrypt_tool.sh &&
-          kmc_decrypt $(grep "^nginx=" /opt/huawei/fce/security/priv/nginx.conf | cut -d "=" -f 2-) nginx')
-        sed -i "s#CERT_PASS:.*#CERT_PASS: $cert_pass#" "$VALUES_FILE"
+          kmc_decrypt $(grep "^nginx=" /opt/huawei/fce/runtime/security/priv/nginx.conf | cut -d "=" -f 2-) nginx')
+        sed -i "s/CERT_PASS:.*/CERT_PASS: $cert_pass/" "$VALUES_FILE"
     fi
 }
 
@@ -264,7 +264,7 @@ function add_nginx_route_to_haproxy() {
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -m "datamate"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -P "3000" -m "datamate"; then
         log_error "Add nginx route to haproxy failed"
         exit 1
     fi
