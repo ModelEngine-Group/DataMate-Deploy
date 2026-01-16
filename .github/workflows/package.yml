@@ -40,6 +40,8 @@ jobs:
 
       - name: DataMate Package
         run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
           mkdir helm
           cp -r DataMate/deployment/helm/datamate helm/datamate
           sed -i "s#^\(\s*repository:\s*\).*#\1\"\"#" helm/datamate/values.yaml
