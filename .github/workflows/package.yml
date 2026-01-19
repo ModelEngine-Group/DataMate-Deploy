@@ -18,6 +18,14 @@ on:
         description: 是否打包deer-flow
         required: false
         default: false
+      aarch:
+        description: 架构
+        required: true
+        default: arm64
+        type: choice
+        options:
+          - arm64
+          - amd64
       version:
         type: string
         description: 版本号
@@ -78,12 +86,12 @@ jobs:
           LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           services=("runtime" "backend" "frontend" "database" "backend-python" "gateway")
           for service in "${services[@]}"; do
-            docker pull ghcr.io/$LOWERCASE_REPO/datamate-$service:latest --platform arm64
+            docker pull ghcr.io/$LOWERCASE_REPO/datamate-$service:latest --platform ${{ inputs.aarch }}
             docker tag ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:${{ inputs.version }}
             docker save -o images/datamate/datamate-$service.tar datamate-$service:${{ inputs.version }}
             docker rmi ghcr.io/$LOWERCASE_REPO/datamate-$service:latest datamate-$service:${{ inputs.version }}
           done
-          docker pull quay.io/kuberay/operator:v1.4.2 --platform arm64
+          docker pull quay.io/kuberay/operator:v1.4.2 --platform ${{ inputs.aarch }}
           docker save -o images/datamate/kuberay-operator.tar quay.io/kuberay/operator:v1.4.2
           docker rmi quay.io/kuberay/operator:v1.4.2
 
@@ -94,7 +102,7 @@ jobs:
           LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           services=("backend" "frontend")
           for service in "${services[@]}"; do
-            docker pull ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest --platform arm64
+            docker pull ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest --platform ${{ inputs.aarch }}
             docker tag ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:${{ inputs.version }}
             docker save -o images/deer-flow/deer-flow-$service.tar deer-flow-$service:${{ inputs.version }}
             docker rmi ghcr.io/$LOWERCASE_REPO/deer-flow-$service:latest deer-flow-$service:${{ inputs.version }}
@@ -104,13 +112,13 @@ jobs:
         if: inputs.milvus == true
         run: |
           mkdir -p images/milvus
-          docker pull milvusdb/milvus:v2.6.5 --platform arm64
+          docker pull milvusdb/milvus:v2.6.5 --platform ${{ inputs.aarch }}
           docker save -o images/milvus/milvus.tar milvusdb/milvus:v2.6.5
           docker rmi milvusdb/milvus:v2.6.5
-          docker pull minio/minio:RELEASE.2024-12-18T13-15-44Z --platform arm64
+          docker pull minio/minio:RELEASE.2024-12-18T13-15-44Z --platform ${{ inputs.aarch }}
           docker save -o images/milvus/minio.tar minio/minio:RELEASE.2024-12-18T13-15-44Z
           docker rmi minio/minio:RELEASE.2024-12-18T13-15-44Z
-          docker pull milvusdb/etcd:3.5.18-r1 --platform arm64
+          docker pull milvusdb/etcd:3.5.18-r1 --platform ${{ inputs.aarch }}
           docker save -o images/milvus/etcd.tar milvusdb/etcd:3.5.18-r1
           docker rmi milvusdb/etcd:3.5.18-r1
 
@@ -119,11 +127,11 @@ jobs:
         run: |
           mkdir -p images/label-studio
           LOWERCASE_REPO=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          docker pull ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest --platform arm64
+          docker pull ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest --platform ${{ inputs.aarch }}
           docker tag ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker save -o images/label-studio/datamate-label-studio.tar datamate-label-studio:${{ inputs.version }}
           docker rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
-          docker pull pgautoupgrade/pgautoupgrade:13-alpine --platform arm64
+          docker pull pgautoupgrade/pgautoupgrade:13-alpine --platform ${{ inputs.aarch }}
           docker save -o images/label-studio/pgautoupgrade.tar pgautoupgrade/pgautoupgrade:13-alpine
           docker rmi pgautoupgrade/pgautoupgrade:13-alpine
 
