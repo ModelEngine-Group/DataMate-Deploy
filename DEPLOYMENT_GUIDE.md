@@ -82,7 +82,6 @@ bash ./install.sh --install \
 ### 注意事项
 
 - 命名空间必须与 ModelEngine 保持一致
-- `--skip-haproxy` 参数必须指定，避免与 ModelEngine 的 HAProxy 配置冲突
 - dataset 和 operator 的 PVC 容量需根据实际业务需求合理设置
 
 ## 参数说明
