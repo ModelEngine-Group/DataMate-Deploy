@@ -68,7 +68,7 @@ bash ./install.sh \
 1. 进入DataMate安装目录，执行如下命令
 sed -i '/{{- define "frontend.selectorLabels" -}}/a \app: {{ include "frontend.name" . }}' helm/datamate/charts/frontend/templates/_helpers.tpl
 2. 通过terrabase指定datamate端口号，进入terrabase安装目录执行如下命令：
-其中ip为5.4.1步骤1设置的弹性ip地址，端口为自定义的datamate访问的前端端口号，建议为ModelEngine访问的前端端口号+1
+其中ip为《ModelEngine 25.0.RC1 安装部署指南》5.4.1步骤1设置的弹性ip地址，端口为自定义的datamate访问的前端端口号，建议为ModelEngine访问的前端端口号+1
 ```bash
 bash ./install.sh --install \
   --ns model-engine \
