@@ -213,7 +213,7 @@ function get_cert_pass() {
         cert_pass=$(kubectl exec -i -n "$NAMESPACE" "$POD_NAME" -- bash -c \
           'source /opt/huawei/fce/runtime/common/kmc_encrypt_decrypt_tool.sh &&
           kmc_decrypt $(grep "^nginx=" /opt/huawei/fce/runtime/security/priv/nginx.conf | cut -d "=" -f 2-) nginx')
-        sed -i "s/CERT_PASS:.*/CERT_PASS: $cert_pass/" "$VALUES_FILE"
+        sed -i "s/CERT_PASS:.*/CERT_PASS: \"$cert_pass\"/" "$VALUES_FILE"
     fi
 }
 
