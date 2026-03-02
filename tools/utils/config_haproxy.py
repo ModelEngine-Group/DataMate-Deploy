@@ -147,13 +147,13 @@ class ClusterInfoOperator(object):
                 front_ip = '{{.TraefikFrontVIP}}'
             updated_lines.extend([
                 f"{section_begin}",
-                f"frontend {namespace}_datamate_frontend",
+                f"frontend {namespace}_{module_name}_datamate_frontend",
                 f"    bind {front_ip}:{front_port} interface {{{{.TraefikFrontIF}}}}",
-                f"    default_backend   {namespace}_datamate_backend",
-                f"    maxconn {{{{.ApisvrFrontMaxConn}}}}",
+                f"    default_backend   {namespace}_{module_name}_datamate_backend",
+                f"    maxconn {{{{.TraefikFrontMaxConn}}}}",
                 f"    mode tcp",
                 "",
-                f"backend {namespace}_datamate_backend",
+                f"backend {namespace}_{module_name}_datamate_backend",
                 f"    default-server inter 2s downinter 5s rise 2 fall 2 slowstart 60s maxconn 2000 maxqueue"
                 f" 200 weight 100",
                 f"    balance   roundrobin",
