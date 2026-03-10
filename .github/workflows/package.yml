@@ -55,6 +55,7 @@ jobs:
           sed -i "s#^\(\s*repository:\s*\).*#\1\"\"#" helm/datamate/values.yaml
           sed -i "s/type: NodePort/type: ClusterIP/g" helm/datamate/values.yaml
           sed -i "s/latest/${{ inputs.version }}/g" helm/datamate/values.yaml
+          sed -i 's#HOME_PAGE_URL: *""#HOME_PAGE_URL: "/data/management"#g' helm/datamate/values.yaml
 
       - name: DeerFlow Package
         if: inputs.deer-flow == true
@@ -131,9 +132,9 @@ jobs:
           docker tag ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker save -o images/label-studio/datamate-label-studio.tar datamate-label-studio:${{ inputs.version }}
           docker rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
-          docker pull pgautoupgrade/pgautoupgrade:13-alpine --platform ${{ inputs.aarch }}
-          docker save -o images/label-studio/pgautoupgrade.tar pgautoupgrade/pgautoupgrade:13-alpine
-          docker rmi pgautoupgrade/pgautoupgrade:13-alpine
+          docker pull edoburu/pgbouncer:latest --platform ${{ inputs.aarch }}
+          docker save -o images/label-studio/pgbouncer.tar edoburu/pgbouncer:latest
+          docker rmi edoburu/pgbouncer:latest
 
       - name: Upload Package
         uses: actions/upload-artifact@v4
