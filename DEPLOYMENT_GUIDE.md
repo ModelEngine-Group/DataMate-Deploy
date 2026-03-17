@@ -37,9 +37,9 @@ cd tools
 
 ## 配套 ModelEngine 安装
 
-当 DataMate 需要配套 ModelEngine 安装时，必须使用以下参数：
+当 DataMate 需要配套 ModelEngine 安装时，需使用以下参数：
 
-### 必需参数
+### 参数
 
 | 参数                            | 说明 | 示例 |
 |-------------------------------|------|------|
@@ -65,9 +65,7 @@ bash ./install.sh \
 ```
 
 当在智算中心场景安装时，需要执行如下步骤：
-1. 进入DataMate安装目录，执行如下命令
-sed -i '/{{- define "frontend.selectorLabels" -}}/a \app: {{ include "frontend.name" . }}' helm/datamate/charts/frontend/templates/_helpers.tpl
-2. 通过terrabase指定datamate端口号，进入terrabase安装目录执行如下命令：
+1. 通过terrabase指定datamate端口号，进入terrabase安装目录执行如下命令：
 其中ip为《ModelEngine 25.0.RC1 安装部署指南》5.4.1步骤1设置的弹性ip地址，端口为自定义的datamate访问的前端端口号，建议为ModelEngine访问的前端端口号+1
 ```bash
 bash ./install.sh --install \
@@ -77,7 +75,7 @@ bash ./install.sh --install \
   --sc sc-system-manage \
   --datamate https://<ip>:<port>
 ```
-3. 参考《ModelEngine 25.0.RC1 安装部署指南》5.4.1步骤4，创建用于数据使能的弹性负载均衡，其中5.4.1-表elb-service参数说明的参数“容器端口”与“服务端口”分别设置为上一步datamate访问的前端端口号和3000
+2. 参考《ModelEngine 25.0.RC1 安装部署指南》5.4.1步骤4，创建用于数据使能的弹性负载均衡，其中5.4.1-表elb-service参数说明的参数“容器端口”与“服务端口”分别设置为上一步datamate访问的前端端口号和3000
 
 ### 注意事项
 
