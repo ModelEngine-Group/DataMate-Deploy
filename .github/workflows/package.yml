@@ -132,8 +132,8 @@ jobs:
           docker tag ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker save -o images/label-studio/datamate-label-studio.tar datamate-label-studio:${{ inputs.version }}
           docker rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
-          docker pull edoburu/pgbouncer:latest --platform ${{ inputs.aarch }}
-          docker save -o images/label-studio/pgbouncer.tar edoburu/pgbouncer:latest
+          docker pull edoburu/pgbouncer:v1.25.1-p0 --platform ${{ inputs.aarch }}
+          docker save -o images/label-studio/pgbouncer.tar edoburu/pgbouncer:v1.25.1-p0
           docker rmi edoburu/pgbouncer:latest
 
       - name: Upload Package
