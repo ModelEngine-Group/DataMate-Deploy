@@ -39,6 +39,7 @@ SKIP_LOAD=false
 INSTALL_MILVUS=true
 INSTALL_LABEL_STUDIO=true
 EXECUTE_HAPROXY=true
+REAL_IP_MODE=proxy_protocol
 
 
 # --- 脚本内部变量 ---
@@ -125,6 +126,10 @@ function read_value() {
   if [ -n "$NODE_PORT" ]; then
     sed -i "s/type: ClusterIP/type: NodePort/g" "$VALUES_FILE"
     sed -i "s/^\(\s*nodePort:\s*\).*/\1${NODE_PORT}/" "$VALUES_FILE"
+  fi
+
+  if [ -n "${REAL_IP_MODE}" ]; then
+    sed -i "/- name: REAL_IP_MODE/{n;s/value: \".*\"/value: \"$REAL_IP_MODE\"/}" "$VALUES_FILE"
   fi
 }
 
@@ -264,7 +269,8 @@ function add_nginx_route_to_haproxy() {
     nginx_service_ip=$(kubectl get svc datamate-frontend -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p "${PORT}" -b "${nginx_service_ip}" -a "${ADDRESS_TYPE}" -P "3000" -m "datamate"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p "${PORT}" -b "${nginx_service_ip}" \
+        -a "${ADDRESS_TYPE}" -P "3000" -m "datamate" --real-ip-mode "${REAL_IP_MODE}"; then
         log_error "Add nginx route to haproxy failed"
         exit 1
     fi
@@ -277,7 +283,8 @@ function add_label_studio_route_to_haproxy() {
     label_studio_service_ip=$(kubectl get svc label-studio -n "${NAMESPACE}" -o=jsonpath='{.spec.clusterIP}')
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
-    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p $((PORT + 1)) -b "${label_studio_service_ip}" -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio"; then
+    if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p $((PORT + 1)) -b "${label_studio_service_ip}" \
+        -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio" --real-ip-mode "${REAL_IP_MODE}"; then
         log_error "Add label studio route to haproxy failed"
         exit 1
     fi
@@ -309,6 +316,7 @@ function main() {
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
       --node-port) NODE_PORT="$2"; shift 2 ;;
+      --real-ip-mode) REAL_IP_MODE="$2"; shift 2 ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac

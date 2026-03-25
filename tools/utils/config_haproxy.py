@@ -87,7 +87,7 @@ class ClusterInfoOperator(object):
             return None
 
     def update_haproxy_data(self, namespace, current_haproxy, front_ip, front_port, backend_ip, backend_port,
-                            address_type, module_name):
+                            address_type, module_name, real_ip_mode):
         # 将当前配置分割成行
         lines = current_haproxy.splitlines()
         updated_lines = []
@@ -123,6 +123,7 @@ class ClusterInfoOperator(object):
 
         # 添加新配置到文件末尾
         logger.info(f'在文件末尾添加新的配置')
+        send_proxy = " send-proxy" if real_ip_mode == "proxy_protocol" else ""
         if address_type == "management":
             if front_ip is None:
                 front_ip = '{{.ApisvrFrontVIP}}'
@@ -138,7 +139,7 @@ class ClusterInfoOperator(object):
                 f"    default-server inter 2s downinter 5s rise 2 fall 2 slowstart 60s maxconn 2000 maxqueue"
                 f" 200 weight 100",
                 f"    balance   roundrobin",
-                f"    server app0 {backend_ip}:{backend_port}",
+                f"    server app0 {backend_ip}:{backend_port}{send_proxy}",
                 f"    mode tcp",
                 f"{section_end}",
             ])
@@ -157,7 +158,7 @@ class ClusterInfoOperator(object):
                 f"    default-server inter 2s downinter 5s rise 2 fall 2 slowstart 60s maxconn 2000 maxqueue"
                 f" 200 weight 100",
                 f"    balance   roundrobin",
-                f"    server app0 {backend_ip}:{backend_port}",
+                f"    server app0 {backend_ip}:{backend_port}{send_proxy}",
                 f"    mode tcp",
                 f"{section_end}",
             ])
@@ -166,7 +167,8 @@ class ClusterInfoOperator(object):
         new_haproxy_content = '\n'.join(updated_lines)
         return new_haproxy_content
 
-    def update(self, namespace, front_ip, front_port, backend_ip, backend_port, address_type, module_name):
+    def update(self, namespace, front_ip, front_port, backend_ip, backend_port, address_type, module_name,
+               real_ip_mode):
         if not self.dump():
             logger.error("dump cluster info failed.")
             return False
@@ -179,7 +181,7 @@ class ClusterInfoOperator(object):
 
         # 更新 haproxy 配置数据
         new_haproxy_content = self.update_haproxy_data(namespace, current_haproxy, front_ip, front_port, backend_ip,
-                                                       backend_port, address_type, module_name)
+                                                       backend_port, address_type, module_name, real_ip_mode)
 
         # 更新配置数据
         config_data['data']['haproxy'] = new_haproxy_content
@@ -273,6 +275,8 @@ def parse_args():
         parser_obj.add_argument('-a', '--address-type', dest="address_type", default="management", type=str,
                                 help='use management id or business ip')
         parser_obj.add_argument('-m', '--module', required=False, default="datamate", type=str, help='module name')
+        parser_obj.add_argument('--real-ip-mode', required=False, default="off", type=str,
+                                help='enable forwarding real ip')
 
     return parser.parse_args()
 
@@ -282,7 +286,7 @@ if __name__ == "__main__":
     operator = ClusterInfoOperator()
     if args.command == 'update':
         operator.update(args.namespace, args.frontend_ip, args.frontend_port, args.backend_ip, args.backend_port,
-                        address_type=args.address_type, module_name=args.module)
+                        address_type=args.address_type, module_name=args.module, real_ip_mode=args.real_ip_mode)
         operator.clear()
     else:
         print("Illegal command!")
