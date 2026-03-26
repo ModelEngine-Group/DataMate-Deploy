@@ -134,7 +134,7 @@ jobs:
           docker rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker pull edoburu/pgbouncer:v1.25.1-p0 --platform ${{ inputs.aarch }}
           docker save -o images/label-studio/pgbouncer.tar edoburu/pgbouncer:v1.25.1-p0
-          docker rmi edoburu/pgbouncer:latest
+          docker rmi edoburu/pgbouncer:v1.25.1-p0
 
       - name: Upload Package
         uses: actions/upload-artifact@v4
