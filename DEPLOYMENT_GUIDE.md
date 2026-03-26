@@ -53,6 +53,21 @@ cd tools
 
 ### 安装命令示例
 
+#### ACE场景
+
+```bash
+bash ./install.sh \
+  --ns model-engine \
+  --repo https://registry.example.com/ \
+  --repo-user admin \
+  --storage-class sc-system-manage \
+  --dataset 500Gi \
+  --operator 50Gi \
+  --port 30000
+```
+
+#### ECE场景
+
 ```bash
 bash ./install.sh \
   --ns model-engine \
@@ -64,7 +79,7 @@ bash ./install.sh \
   --skip-haproxy
 ```
 
-当在智算中心场景安装时，需要执行如下步骤：
+需要额外执行如下步骤：
 1. 通过terrabase指定datamate端口号，进入terrabase安装目录执行如下命令：
 其中ip为《ModelEngine 25.0.RC1 安装部署指南》5.4.1步骤1设置的弹性ip地址，端口为自定义的datamate访问的前端端口号，建议为ModelEngine访问的前端端口号+1
 ```bash
