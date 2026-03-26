@@ -62,7 +62,7 @@ UTILS_PATH="${WORK_DIR}/utils"
 HELM_PATH="$(realpath "${WORK_DIR}/../helm")"
 VALUES_FILE="$(realpath "${HELM_PATH}/datamate/values.yaml")"
 MILVUS_VALUES_FILE="$(realpath "${HELM_PATH}/milvus/values.yaml")"
-LABEL_STUDIO_VALUES_FILE="$(realpath "${HELM_PATH}/label-studio/values.yaml")"
+LABEL_STUDIO_VALUES_FILE="${HELM_PATH}/label-studio/values.yaml"
 IMAGE_PATH="$(realpath "${WORK_DIR}/../images")"
 
 . "${WORK_DIR}/utils/common.sh"

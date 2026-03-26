@@ -79,7 +79,7 @@ jobs:
           cp -r DataMate/deployment/helm/label-studio helm/label-studio
           sed -i "s#heartexlabs/label-studio#datamate-label-studio#g" helm/label-studio/values.yaml
           sed -i "s/type: NodePort/type: ClusterIP/g" helm/label-studio/values.yaml
-          sed -i '/latest/{s/latest/${{ inputs.version }}/; :a; n; ba;}' helm/label-studio/values.yaml
+          sed -i "s/latest/${{ inputs.version }}/g" helm/label-studio/values.yaml
 
       - name: Download DataMate Image
         run: |
@@ -132,9 +132,9 @@ jobs:
           docker tag ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
           docker save -o images/label-studio/datamate-label-studio.tar datamate-label-studio:${{ inputs.version }}
           docker rmi ghcr.io/$LOWERCASE_REPO/datamate-label-studio:latest datamate-label-studio:${{ inputs.version }}
-          docker pull edoburu/pgbouncer:latest --platform ${{ inputs.aarch }}
-          docker save -o images/label-studio/pgbouncer.tar edoburu/pgbouncer:latest
-          docker rmi edoburu/pgbouncer:latest
+          docker pull edoburu/pgbouncer:v1.25.1-p0 --platform ${{ inputs.aarch }}
+          docker save -o images/label-studio/pgbouncer.tar edoburu/pgbouncer:v1.25.1-p0
+          docker rmi edoburu/pgbouncer:v1.25.1-p0
 
       - name: Upload Package
         uses: actions/upload-artifact@v4
