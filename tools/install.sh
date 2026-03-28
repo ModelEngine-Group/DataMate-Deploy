@@ -128,8 +128,10 @@ function read_value() {
     sed -i "s/^\(\s*nodePort:\s*\).*/\1${NODE_PORT}/" "$VALUES_FILE"
   fi
 
-  if [ -n "${REAL_IP_MODE}" ]; then
+  if [ "${REAL_IP_MODE}" == 'proxy_protocol' ]; then
     sed -i "/- name: REAL_IP_MODE/{n;s/value: \".*\"/value: \"$REAL_IP_MODE\"/}" "$VALUES_FILE"
+    # Modify OMS_AUTH_ENABLED environment variable for gateway
+    sed -i "/- name: OMS_AUTH_ENABLED/{n;s/value: \".*\"/value: \"true\"/}" "$VALUES_FILE"
   fi
 }
 
