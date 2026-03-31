@@ -13,6 +13,8 @@
 ###       --repo <url>                Specify the image repository url.
 ###       --repo-user <user>          Specify the username for the image repository.
 ###       --sc, --storage-class <sc>  Specify the storage class name.
+###       --real-ip-mode              Specify if and how to enable real-ip-forwarding, available option: off, proxy_protocol(default).
+###       --disable-jwt               Disable user data isolation.
 ###       --skip-haproxy              Skip HAProxy configuration.
 ###       --skip-label-studio         Skip Label Studio installation.
 ###       --skip-load                 Skip loading images.
@@ -39,6 +41,7 @@ SKIP_LOAD=false
 INSTALL_MILVUS=true
 INSTALL_LABEL_STUDIO=true
 EXECUTE_HAPROXY=true
+DATAMATE_JWT_ENABLE=true
 REAL_IP_MODE=proxy_protocol
 
 
@@ -132,6 +135,10 @@ function read_value() {
     sed -i "/- name: REAL_IP_MODE/{n;s/value: \".*\"/value: \"$REAL_IP_MODE\"/}" "$VALUES_FILE"
     # Modify OMS_AUTH_ENABLED environment variable for gateway
     sed -i "/- name: OMS_AUTH_ENABLED/{n;s/value: \".*\"/value: \"true\"/}" "$VALUES_FILE"
+  fi
+
+  if [ "${DATAMATE_JWT_ENABLE}" == 'true' ]; then
+    sed -i '' '/&DATAMATE_JWT_ENABLE/s/false/true/' "$VALUES_FILE"
   fi
 }
 
@@ -319,6 +326,7 @@ function main() {
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
       --node-port) NODE_PORT="$2"; shift 2 ;;
       --real-ip-mode) REAL_IP_MODE="$2"; shift 2 ;;
+      --disenable-jwt) DATAMATE_JWT_ENABLE=false; shift ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
