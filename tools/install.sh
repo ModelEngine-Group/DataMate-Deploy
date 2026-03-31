@@ -138,7 +138,7 @@ function read_value() {
   fi
 
   if [ "${DATAMATE_JWT_ENABLE}" == 'true' ]; then
-    sed -i '' '/&DATAMATE_JWT_ENABLE/s/false/true/' "$VALUES_FILE"
+    sed -i '/&DATAMATE_JWT_ENABLE/s/false/true/' "$VALUES_FILE"
   fi
 }
 
