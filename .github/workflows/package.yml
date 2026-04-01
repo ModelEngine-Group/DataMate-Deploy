@@ -44,6 +44,7 @@ jobs:
         with:
           owner: ModelEngine-Group
           repository: 'DataMate'
+          branch: 'fix-jwt'
           access-token: ${{ secrets.ACCESS_TOKEN }}
 
       - name: DataMate Package
