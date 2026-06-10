@@ -6,7 +6,7 @@
 
 升级前需要确认以下信息：
 
-1. 旧版本和新版本的版本号、镜像地址、部署包来源。
+1. 命名空间、镜像仓库地址、DataMate部署的端口号，存储数据所用存储类的名称。
 2. 本地备份目录和可用磁盘空间是否满足数据导出需求。
 3. 是否已安排升级窗口，并停止用户写入或后台任务写入。
 
@@ -24,6 +24,37 @@ bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port 5444 --
 ```bash
 ./upgrade.sh -n model-engine --backup-dir /tmp/datamate-upgrade-backup --repo <镜像仓库地址>
 ```
+
+## 参数说明
+
+`upgrade.sh` 当前支持以下参数。不在表内的参数会中断脚本并提示不支持。
+
+| 参数 | 是否需要值 | 说明 |
+| --- | --- | --- |
+| `-n`, `--ns`, `--namespace` | 是 | 指定 Kubernetes 命名空间，默认 `model-engine`。 |
+| `--backup-dir` | 是 | 指定本地升级备份根目录，默认 `tools/upgrade-state/<namespace>-backup`。 |
+| `--confirm` | 否 | 确认升级完成，调用 `uninstall.sh` 卸载旧版本 `edatamate` 和 `vdb`，并删除备份目录。 |
+| `--rollback` | 否 | 回滚升级，调用 `uninstall.sh` 卸载新版本 `datamate`，并将旧版本 Deployment 扩容为 1。 |
+| `-h`, `--help` | 否 | 打印帮助信息。 |
+
+升级模式下，以下安装参数会透传给 `install.sh`：
+
+| 参数 | 是否需要值 | 说明 |
+| --- | --- | --- |
+| `--address-type` | 是 | 指定访问地址类型。 |
+| `--sc`, `--storage-class` | 是 | 指定存储类。 |
+| `--repo` | 是 | 指定镜像仓库地址。 |
+| `--repo-user` | 是 | 指定镜像仓库用户名。 |
+| `--operator` | 是 | 指定算子 PVC 容量。 |
+| `--path` | 是 | 指定本地存储路径。 |
+| `--port` | 是 | 指定服务端口。 |
+| `--dataset` | 是 | 指定数据集 PVC 容量。 |
+| `--package` | 是 | 指定自定义算子包路径。 |
+| `--node-port` | 是 | 指定 NodePort 端口。 |
+| `--skip-push` | 否 | 跳过镜像推送。 |
+| `--skip-load` | 否 | 跳过镜像加载。 |
+| `--skip-milvus` | 否 | 跳过 Milvus 安装。 |
+| `--skip-label-studio`, `--skip-ls` | 否 | 跳过 Label Studio 安装。 |
 
 ## 升级后验证
 
