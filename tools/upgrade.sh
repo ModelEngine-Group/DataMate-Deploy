@@ -29,8 +29,8 @@ DATASET_REMOTE_DIR="/dataset"
 
 NAMESPACE="$DEFAULT_NAMESPACE"
 OLD_SELECTOR="$DEFAULT_OLD_SELECTOR"
-OLD_DB_SELECTOR="$DEFAULT_OLD_SELECTOR"
-OLD_FILE_SELECTOR="$DEFAULT_OLD_SELECTOR"
+OLD_DB_SELECTOR="app=edatamate,tier=backend-db"
+OLD_FILE_SELECTOR="app=edatamate,tier=backend"
 NEW_SELECTOR="$DEFAULT_NEW_SELECTOR"
 NEW_DB_SELECTOR="$DEFAULT_NEW_DB_SELECTOR"
 NEW_FILE_SELECTOR="$DEFAULT_NEW_FILE_SELECTOR"
@@ -188,7 +188,6 @@ function scale_old_to_zero() {
 
   log_info "停止旧版本 DataMate Deployment，selector=${OLD_SELECTOR}，namespace=${NAMESPACE}。"
   kubectl scale deployment -l "$OLD_SELECTOR" --replicas=0 -n "$NAMESPACE"
-  kubectl wait --for=delete pod -l "$OLD_SELECTOR" -n "$NAMESPACE" --timeout=300s >/dev/null || true
 }
 
 function scale_old_to_one() {
@@ -204,7 +203,7 @@ function scale_old_to_one() {
 
 function install_new_version() {
   log_info "开始部署新版本 DataMate。"
-  bash "${WORK_DIR}/install.sh" -n "$NAMESPACE" --skip-haproxy "${INSTALL_ARGS[@]}"
+  bash "${WORK_DIR}/install.sh" -n "$NAMESPACE" "${INSTALL_ARGS[@]}"
 }
 
 function export_old_data() {

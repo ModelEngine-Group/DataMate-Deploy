@@ -1,6 +1,6 @@
 # DataMate 升级文档
 
-本文档用于指导 DataMate 从旧版本升级到新版本。整体流程采用“先备份、再停旧、后部署、再导入”的方式，避免升级过程中旧版本继续写入数据，降低数据不一致风险。
+本文档用于指导 DataMate 从ModelEngine eDataMate旧版本升级到当前版本。整体流程采用“先备份、再停旧、后部署、再导入”的方式，避免升级过程中旧版本继续写入数据，降低数据不一致风险。
 
 ## 升级前准备
 
@@ -14,15 +14,19 @@
 
 ```bash
 # 进入安装包解压后目录
-bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port 5444 --sc sc-system-manage
+bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port <自定义端口号> --sc sc-system-manage
 ```
 
 `upgrade.sh` 通过内置标签识别旧版本资源、迁移 Pod 和新版本 Pod。除升级脚本自身参数外，已支持的安装参数会透传给 `install.sh`。
 
-默认本地备份根目录为 `tools/upgrade-state/<namespace>-backup`。如需指定本地备份根目录，可增加 `--backup-dir <dir>`：
-
+通过terrabase指定datamate端口号，进入terrabase安装目录执行如下命令：
+其中ip为《ModelEngine 25.1.0 安装部署指南》5.4.1步骤1设置的弹性ip地址，端口为上一步中自定义的datamate访问的前端端口号，建议为ModelEngine访问的前端端口号+1，sc为部署ME时使用的存储类
 ```bash
-./upgrade.sh -n model-engine --backup-dir /tmp/datamate-upgrade-backup --repo <镜像仓库地址>
+bash tools/install.sh --install \
+  --ns model-engine \
+  --repo https://registry.example.com/ \
+  --sc sc-system-manage \
+  --datamate https://<ip>:<port>
 ```
 
 ## 参数说明
@@ -72,14 +76,10 @@ bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port 5444 --
 
 ```bash
 cd tools
-./upgrade.sh -n model-engine --confirm
+bash tools/upgrade.sh -n model-engine --confirm
 ```
 
-确认完成后，脚本会删除升级备份目录。如果升级时指定了 `--backup-dir`，确认升级时也需要传入同一个目录：
-
-```bash
-./upgrade.sh -n model-engine --backup-dir <dir> --confirm
-```
+确认完成后，脚本会删除升级备份目录。
 
 ## 回滚说明
 
@@ -98,7 +98,7 @@ cd tools
 
 ```bash
 cd tools
-./upgrade.sh -n model-engine --rollback
+bash tools/upgrade.sh -n model-engine --rollback
 ```
 
 回滚会调用 `uninstall.sh` 卸载新版本 `datamate` release，并将旧版本 DataMate Deployment 扩容为 1 个副本。
