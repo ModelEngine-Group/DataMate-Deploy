@@ -277,7 +277,7 @@ function confirm_upgrade() {
 
 function uninstall_new_version() {
   log_info "开始卸载新版本 DataMate。"
-  bash "${WORK_DIR}/uninstall.sh" -n "$NAMESPACE" --skip-haproxy --skip-milvus --skip-label-studio
+  bash "${WORK_DIR}/uninstall.sh" -n "$NAMESPACE"
 }
 
 function rollback_upgrade() {
