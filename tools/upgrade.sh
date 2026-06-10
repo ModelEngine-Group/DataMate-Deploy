@@ -206,6 +206,30 @@ function install_new_version() {
   bash "${WORK_DIR}/install.sh" -n "$NAMESPACE" "${INSTALL_ARGS[@]}"
 }
 
+function wait_new_database_ready() {
+  log_info "等待新版本数据库 Pod Ready。"
+  kubectl wait --for=condition=Ready pod -l "$NEW_DB_SELECTOR" -n "$NAMESPACE" --timeout=300s >/dev/null
+
+  local new_db_pod
+  new_db_pod=$(get_running_pod "$NEW_DB_SELECTOR" "新版本数据库")
+
+  log_info "等待新版本数据库服务可用，pod=${new_db_pod}。"
+  if ! kubectl exec "$new_db_pod" -n "$NAMESPACE" -- bash -c '
+    for i in $(seq 1 60); do
+      if command -v pg_isready >/dev/null 2>&1; then
+        pg_isready -U postgres -d datamate >/dev/null 2>&1 && exit 0
+      else
+        PGPASSWORD="$POSTGRES_PASSWORD" psql -U postgres -d datamate -c "SELECT 1" >/dev/null 2>&1 && exit 0
+      fi
+      sleep 5
+    done
+    exit 1
+  '; then
+    log_error "错误: 新版本数据库启动超时。"
+    exit 1
+  fi
+}
+
 function export_old_data() {
   init_backup_paths
 
@@ -289,6 +313,7 @@ function run_upgrade() {
   export_old_data
   scale_old_to_zero
   install_new_version
+  wait_new_database_ready
   import_new_data
   log_info "DataMate 新版本部署和数据导入完成。验证通过后请执行 ./upgrade.sh -n ${NAMESPACE} --confirm 清理旧版本；需要回滚时执行 ./upgrade.sh -n ${NAMESPACE} --rollback。"
 }
