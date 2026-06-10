@@ -14,7 +14,7 @@
 
 ```bash
 # 进入安装包解压后目录
-bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port <自定义端口号> --sc sc-system-manage
+bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port <自定义端口号> --sc <存储类名称>
 ```
 
 `upgrade.sh` 通过内置标签识别旧版本资源、迁移 Pod 和新版本 Pod。除升级脚本自身参数外，已支持的安装参数会透传给 `install.sh`。
@@ -66,16 +66,14 @@ bash tools/install.sh --install \
 
 1. 前端页面可正常访问。
 2. 数据集列表和数据集详情可正常加载。
-3. 历史流程可查看，流程文件可访问。
-4. 自定义算子可查看、加载和执行。
-5. 新建测试任务可正常运行。
-6. 后端、Python 后端、运行时、数据库日志无持续异常。
-7. 可选组件功能符合预期。
+3. 自定义算子可查看、加载和执行。
+4. 新建任务可正常运行。
+5. 后端、Python 后端、运行时、数据库日志无持续异常。
+6. 可选组件功能符合预期。
 
 验证通过后，执行确认升级命令清理旧版本 DataMate 资源。该操作会调用 `uninstall.sh` 卸载旧版本 `edatamate` 和 `vdb` release，并删除升级备份目录：
 
 ```bash
-cd tools
 bash tools/upgrade.sh -n model-engine --confirm
 ```
 
@@ -97,7 +95,6 @@ bash tools/upgrade.sh -n model-engine --confirm
 若需要回滚脚本流程，执行：
 
 ```bash
-cd tools
 bash tools/upgrade.sh -n model-engine --rollback
 ```
 
