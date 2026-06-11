@@ -234,6 +234,7 @@ function get_cert_pass() {
 function helm_install() {
   local release_name="$1"
   local chart_path="$2"
+  shift 2
 
   local helm_args=()
 
@@ -241,6 +242,11 @@ function helm_install() {
   helm_args+=("--install")
   helm_args+=("--namespace" "$NAMESPACE")
   helm_args+=("--create-namespace")
+
+  # Append extra args (e.g., --set key=value)
+  for arg in "$@"; do
+    helm_args+=("$arg")
+  done
 
   log_info "即将执行: helm ${helm_args[*]}"
 
@@ -250,8 +256,31 @@ function helm_install() {
   fi
 }
 
+function install_sealed_secrets() {
+  local chart_tgz
+  chart_tgz=$(ls "${HELM_PATH}/sealed-secrets/sealed-secrets-"*.tgz 2>/dev/null | head -1)
+  if [ -z "$chart_tgz" ]; then
+    log_error "sealed-secrets Helm chart not found in ${HELM_PATH}/sealed-secrets/"
+    exit 1
+  fi
+  log_info "Installing sealed-secrets controller..."
+  helm upgrade --install sealed-secrets "$chart_tgz" \
+    -n "$NAMESPACE" --create-namespace \
+    --set image.registry="${REPO}" \
+    --set image.tag=0.27.0 \
+    --set image.pullPolicy=IfNotPresent \
+    --wait --timeout 120s
+  log_info "sealed-secrets controller installed."
+}
+
 function install_datamate() {
-  helm_install "datamate" "${HELM_PATH}/datamate"
+  local extra_args=()
+  if [ "$DATAMATE_JWT_ENABLE" == "true" ]; then
+    extra_args+=("--set" "datamate.jwt.enable=true")
+  fi
+  helm_install "datamate" "${HELM_PATH}/datamate" \
+    --set public.secrets.create=false \
+    "${extra_args[@]}"
 }
 
 function install_milvus() {
@@ -263,6 +292,17 @@ function install_label_studio() {
 }
 
 function install() {
+  # 1. Install sealed-secrets controller first
+  install_sealed_secrets
+
+  # 2. Generate sealed secrets (from .env or interactive input)
+  log_info "Generating SealedSecret resources..."
+  bash "${WORK_DIR}/generate-sealed-secrets.sh" \
+    -n "$NAMESPACE" \
+    $([ "$INSTALL_MILVUS" = false ] && echo "--skip-milvus") \
+    $([ "$INSTALL_LABEL_STUDIO" = false ] && echo "--skip-label-studio")
+
+  # 3. Install DataMate components
   install_datamate
   if [ "$INSTALL_MILVUS" == "true" ]; then
     install_milvus
@@ -334,7 +374,6 @@ function main() {
 
   read_value
   read_storage_value
-  get_cert_pass
   load_images "datamate"
   if [ "$INSTALL_MILVUS" == "true" ]; then
     load_images "milvus"
