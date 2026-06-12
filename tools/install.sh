@@ -264,9 +264,10 @@ function install_sealed_secrets() {
     exit 1
   fi
   log_info "Installing sealed-secrets controller..."
+  local registry="${REPO:-docker.io}"
   helm upgrade --install sealed-secrets "$chart_tgz" \
     -n "$NAMESPACE" --create-namespace \
-    --set image.registry="${REPO}" \
+    --set image.registry="${registry}" \
     --set image.tag=0.27.0 \
     --set image.pullPolicy=IfNotPresent \
     --wait --timeout 120s

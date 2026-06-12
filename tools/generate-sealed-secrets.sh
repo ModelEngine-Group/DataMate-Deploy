@@ -53,15 +53,25 @@ kubectl wait pod -l app.kubernetes.io/instance="${CONTROLLER_NAME}" \
   -n "${NAMESPACE}" --for=condition=Ready --timeout=120s
 
 # ========== Check kubeseal ==========
-if [ ! -f "$KUBESEAL" ]; then
+# Test if a binary can actually run on this machine
+ensure_runnable() {
+  local bin="$1"
+  chmod +x "$bin" 2>/dev/null || true
+  "$bin" --version >/dev/null 2>&1 && return 0
+  return 1
+}
+
+if [ -f "$KUBESEAL" ] && ! ensure_runnable "$KUBESEAL"; then
+  log_warn "Bundled kubeseal is not compatible with this platform, trying system kubeseal..."
+  KUBESEAL="$(command -v kubeseal 2>/dev/null || echo "")"
+elif [ ! -f "$KUBESEAL" ]; then
   KUBESEAL="$(command -v kubeseal 2>/dev/null || echo "")"
 fi
-if [ -z "$KUBESEAL" ]; then
+if [ -z "$KUBESEAL" ] || ! ensure_runnable "$KUBESEAL"; then
   log_error "kubeseal not found at ${WORK_DIR}/bin/kubeseal or in PATH"
   exit 1
 fi
 log_info "Using kubeseal: $KUBESEAL"
-chmod +x "$KUBESEAL" 2>/dev/null || true
 
 # ========== Secret Collection ==========
 prompt_or_default() {
@@ -114,7 +124,7 @@ if [ "$SKIP_MILVUS" = false ]; then
 fi
 
 # ========== Generate SealedSecret YAML ==========
-SEAL_ARGS="--controller-name=${CONTROLLER_NAME} --namespace=${NAMESPACE} -o yaml"
+SEAL_ARGS="--controller-name=${CONTROLLER_NAME} --controller-namespace=${NAMESPACE} -o yaml"
 
 create_sealed_secret() {
   local secret_name="$1" namespace="$2" output_file="$3"
