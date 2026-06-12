@@ -376,6 +376,17 @@ generate_helm_args() {
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].value=${LABEL_VALUE}"
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].effect=${TAINT_EFFECT}"
         
+        # Milvus sub-chart tolerations (etcd, minio don't inherit parent chart tolerations)
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string etcd.tolerations[0].key=${LABEL_KEY}"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string etcd.tolerations[0].operator=Equal"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string etcd.tolerations[0].value=${LABEL_VALUE}"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string etcd.tolerations[0].effect=${TAINT_EFFECT}"
+        
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string minio.tolerations[0].key=${LABEL_KEY}"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string minio.tolerations[0].operator=Equal"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string minio.tolerations[0].value=${LABEL_VALUE}"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string minio.tolerations[0].effect=${TAINT_EFFECT}"
+        
         # Sealed-secrets-specific tolerations (same format as Milvus)
         HELM_SEALED_SECRETS_TOLERATIONS="--set-string tolerations[0].key=${LABEL_KEY}"
         HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].operator=Equal"
