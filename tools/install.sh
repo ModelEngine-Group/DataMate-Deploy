@@ -304,9 +304,6 @@ function install_datamate() {
   # Build helm command with all args (string expansion, not array)
   helm_install "datamate" "${HELM_PATH}/datamate" \
     --set public.secrets.create=false $jwt_args $node_selector_args $tolerations_args
-  
-  # Cleanup temp args file
-  rm -f /tmp/datamate-helm-args.sh
 }
 
 function install_milvus() {
@@ -351,6 +348,9 @@ function install() {
   if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
     install_label_studio
   fi
+  
+  # Cleanup node isolation temp file (all components have sourced it)
+  rm -f /tmp/datamate-helm-args.sh
 }
 
 function add_nginx_route_to_haproxy() {
