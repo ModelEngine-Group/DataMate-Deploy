@@ -303,7 +303,9 @@ function install_datamate() {
   
   # Build helm command with all args (string expansion, not array)
   helm_install "datamate" "${HELM_PATH}/datamate" \
-    --set public.secrets.create=false $jwt_args $node_selector_args $tolerations_args
+    --set public.secrets.create=false \
+    --set public.persistentVolumeClaim.accessModes=ReadWriteOnce \
+    $jwt_args $node_selector_args $tolerations_args
 }
 
 function install_milvus() {
@@ -316,7 +318,9 @@ function install_milvus() {
   fi
   
   # Build helm command with tolerations (string expansion, not array)
-  helm_install "milvus" "${HELM_PATH}/milvus" $tolerations_args
+  helm_install "milvus" "${HELM_PATH}/milvus" \
+    --set log.persistence.persistentVolumeClaim.accessModes=ReadWriteOnce \
+    $tolerations_args
 }
 
 function install_label_studio() {
