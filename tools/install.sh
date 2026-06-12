@@ -297,7 +297,18 @@ function install_datamate() {
 }
 
 function install_milvus() {
-  helm_install "milvus" "${HELM_PATH}/milvus"
+  local extra_args=()
+  
+  # Source node isolation args if available
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    # Milvus uses direct tolerations format, not global.tolerations
+    if [ -n "$HELM_MILVUS_TOLERATIONS" ]; then
+      extra_args+=("$HELM_MILVUS_TOLERATIONS")
+    fi
+  fi
+  
+  helm_install "milvus" "${HELM_PATH}/milvus" "${extra_args[@]}"
 }
 
 function install_label_studio() {

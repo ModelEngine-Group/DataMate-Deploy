@@ -369,6 +369,12 @@ generate_helm_args() {
         HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS --set-string global.tolerations[0].operator=Equal"
         HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS --set-string global.tolerations[0].value=${LABEL_VALUE}"
         HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS --set-string global.tolerations[0].effect=${TAINT_EFFECT}"
+        
+        # Milvus-specific tolerations (Milvus chart uses direct tolerations, not global.tolerations)
+        HELM_MILVUS_TOLERATIONS="--set-string tolerations[0].key=${LABEL_KEY}"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].operator=Equal"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].value=${LABEL_VALUE}"
+        HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].effect=${TAINT_EFFECT}"
 
         for SERVICE in $SERVICES; do
             HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS --set-string ${SERVICE}.tolerations[0].key=${LABEL_KEY}"
@@ -404,6 +410,7 @@ generate_helm_args() {
         HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS --set-string kuberay-operator.tolerations[0].effect=${TAINT_EFFECT}"
     else
         HELM_TOLERATIONS_ARGS=""
+        HELM_MILVUS_TOLERATIONS=""
     fi
 
     # Write Helm args to temp file for install.sh to source
@@ -411,6 +418,7 @@ generate_helm_args() {
     cat > "$HELM_ARGS_FILE" <<EOF
 export HELM_NODE_SELECTOR_ARGS="$HELM_NODE_SELECTOR_ARGS"
 export HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS"
+export HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS"
 EOF
 }
 
