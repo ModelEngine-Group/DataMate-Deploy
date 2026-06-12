@@ -269,57 +269,57 @@ function install_sealed_secrets() {
   local registry="${REPO:-docker.io}"
   
   # Source node isolation args if available
-  local extra_args=()
+  local tolerations_args=""
   if [ -f /tmp/datamate-helm-args.sh ]; then
     source /tmp/datamate-helm-args.sh
-    if [ -n "$HELM_SEALED_SECRETS_TOLERATIONS" ]; then
-      extra_args+=("$HELM_SEALED_SECRETS_TOLERATIONS")
-    fi
+    tolerations_args="$HELM_SEALED_SECRETS_TOLERATIONS"
   fi
   
+  # Build helm command with tolerations (string expansion, not array)
   helm upgrade --install sealed-secrets "$chart_tgz" \
     -n "$NAMESPACE" --create-namespace \
     --set image.registry="${registry}" \
     --set image.tag=0.27.0 \
     --set image.pullPolicy=IfNotPresent \
-    --wait --timeout 120s \
-    "${extra_args[@]}"
+    --wait --timeout 120s $tolerations_args
   log_info "sealed-secrets controller installed."
 }
 
 function install_datamate() {
-  local extra_args=()
+  local jwt_args=""
+  local node_selector_args=""
+  local tolerations_args=""
+  
   if [ "$DATAMATE_JWT_ENABLE" == "true" ]; then
-    extra_args+=("--set" "datamate.jwt.enable=true")
+    jwt_args="--set datamate.jwt.enable=true"
   fi
   
   # Source node isolation args if available
   if [ -f /tmp/datamate-helm-args.sh ]; then
     source /tmp/datamate-helm-args.sh
-    extra_args+=("$HELM_NODE_SELECTOR_ARGS" "$HELM_TOLERATIONS_ARGS")
+    node_selector_args="$HELM_NODE_SELECTOR_ARGS"
+    tolerations_args="$HELM_TOLERATIONS_ARGS"
   fi
   
+  # Build helm command with all args (string expansion, not array)
   helm_install "datamate" "${HELM_PATH}/datamate" \
-    --set public.secrets.create=false \
-    "${extra_args[@]}"
+    --set public.secrets.create=false $jwt_args $node_selector_args $tolerations_args
   
   # Cleanup temp args file
   rm -f /tmp/datamate-helm-args.sh
 }
 
 function install_milvus() {
-  local extra_args=()
+  local tolerations_args=""
   
   # Source node isolation args if available
   if [ -f /tmp/datamate-helm-args.sh ]; then
     source /tmp/datamate-helm-args.sh
-    # Milvus uses direct tolerations format, not global.tolerations
-    if [ -n "$HELM_MILVUS_TOLERATIONS" ]; then
-      extra_args+=("$HELM_MILVUS_TOLERATIONS")
-    fi
+    tolerations_args="$HELM_MILVUS_TOLERATIONS"
   fi
   
-  helm_install "milvus" "${HELM_PATH}/milvus" "${extra_args[@]}"
+  # Build helm command with tolerations (string expansion, not array)
+  helm_install "milvus" "${HELM_PATH}/milvus" $tolerations_args
 }
 
 function install_label_studio() {
