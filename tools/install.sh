@@ -320,7 +320,16 @@ function install_milvus() {
 }
 
 function install_label_studio() {
-  helm_install "label-studio" "${HELM_PATH}/label-studio"
+  local tolerations_args=""
+  
+  # Source node isolation args if available
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    tolerations_args="$HELM_LABEL_STUDIO_TOLERATIONS"
+  fi
+  
+  # Build helm command with tolerations (string expansion, not array)
+  helm_install "label-studio" "${HELM_PATH}/label-studio" $tolerations_args
 }
 
 function install() {
