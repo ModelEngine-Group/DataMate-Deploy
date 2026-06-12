@@ -267,12 +267,23 @@ function install_sealed_secrets() {
   fi
   log_info "Installing sealed-secrets controller..."
   local registry="${REPO:-docker.io}"
+  
+  # Source node isolation args if available
+  local extra_args=()
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    if [ -n "$HELM_SEALED_SECRETS_TOLERATIONS" ]; then
+      extra_args+=("$HELM_SEALED_SECRETS_TOLERATIONS")
+    fi
+  fi
+  
   helm upgrade --install sealed-secrets "$chart_tgz" \
     -n "$NAMESPACE" --create-namespace \
     --set image.registry="${registry}" \
     --set image.tag=0.27.0 \
     --set image.pullPolicy=IfNotPresent \
-    --wait --timeout 120s
+    --wait --timeout 120s \
+    "${extra_args[@]}"
   log_info "sealed-secrets controller installed."
 }
 

@@ -375,6 +375,12 @@ generate_helm_args() {
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].operator=Equal"
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].value=${LABEL_VALUE}"
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string tolerations[0].effect=${TAINT_EFFECT}"
+        
+        # Sealed-secrets-specific tolerations (same format as Milvus)
+        HELM_SEALED_SECRETS_TOLERATIONS="--set-string tolerations[0].key=${LABEL_KEY}"
+        HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].operator=Equal"
+        HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].value=${LABEL_VALUE}"
+        HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].effect=${TAINT_EFFECT}"
 
         for SERVICE in $SERVICES; do
             HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS --set-string ${SERVICE}.tolerations[0].key=${LABEL_KEY}"
@@ -411,6 +417,7 @@ generate_helm_args() {
     else
         HELM_TOLERATIONS_ARGS=""
         HELM_MILVUS_TOLERATIONS=""
+        HELM_SEALED_SECRETS_TOLERATIONS=""
     fi
 
     # Write Helm args to temp file for install.sh to source
@@ -419,6 +426,7 @@ generate_helm_args() {
 export HELM_NODE_SELECTOR_ARGS="$HELM_NODE_SELECTOR_ARGS"
 export HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS"
 export HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS"
+export HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS"
 EOF
 }
 
