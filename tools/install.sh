@@ -20,6 +20,7 @@
 ###       --skip-load                 Skip loading images.
 ###       --skip-milvus               Skip Milvus installation.
 ###       --skip-push                 Skip pushing images.
+###       --skip-node-setup           Skip node isolation configuration.
 ###   -h, --help                      Show this help message.
 
 set -e
@@ -43,6 +44,7 @@ INSTALL_LABEL_STUDIO=true
 EXECUTE_HAPROXY=true
 DATAMATE_JWT_ENABLE=true
 REAL_IP_MODE=proxy_protocol
+SKIP_NODE_SETUP=false
 
 
 # --- 脚本内部变量 ---
@@ -279,9 +281,19 @@ function install_datamate() {
   if [ "$DATAMATE_JWT_ENABLE" == "true" ]; then
     extra_args+=("--set" "datamate.jwt.enable=true")
   fi
+  
+  # Source node isolation args if available
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    extra_args+=("$HELM_NODE_SELECTOR_ARGS" "$HELM_TOLERATIONS_ARGS")
+  fi
+  
   helm_install "datamate" "${HELM_PATH}/datamate" \
     --set public.secrets.create=false \
     "${extra_args[@]}"
+  
+  # Cleanup temp args file
+  rm -f /tmp/datamate-helm-args.sh
 }
 
 function install_milvus() {
@@ -293,17 +305,23 @@ function install_label_studio() {
 }
 
 function install() {
-  # 1. Install sealed-secrets controller first
+  # 1. Node isolation setup (interactive, optional)
+  if [ "$SKIP_NODE_SETUP" == "false" ]; then
+    log_info "Configuring node isolation (optional)..."
+    bash "${WORK_DIR}/node-setup.sh" --namespace "$NAMESPACE"
+  fi
+
+  # 2. Install sealed-secrets controller
   install_sealed_secrets
 
-  # 2. Generate sealed secrets (from .env or interactive input)
+  # 3. Generate sealed secrets (from .env or interactive input)
   log_info "Generating SealedSecret resources..."
   bash "${WORK_DIR}/generate-sealed-secrets.sh" \
     -n "$NAMESPACE" \
     $([ "$INSTALL_MILVUS" = false ] && echo "--skip-milvus") \
     $([ "$INSTALL_LABEL_STUDIO" = false ] && echo "--skip-label-studio")
 
-  # 3. Install DataMate components
+  # 4. Install DataMate components
   install_datamate
   if [ "$INSTALL_MILVUS" == "true" ]; then
     install_milvus
@@ -363,6 +381,7 @@ function main() {
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
       --skip-label-studio|--skip-ls) INSTALL_LABEL_STUDIO=false; shift ;;
+      --skip-node-setup) SKIP_NODE_SETUP=true; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
       --node-port) NODE_PORT="$2"; shift 2 ;;
