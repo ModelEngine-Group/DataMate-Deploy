@@ -174,6 +174,48 @@ function read_storage_value() {
       cd -  >/dev/null || exit
     fi
   fi
+
+  get_blocked_ip
+}
+
+function get_blocked_ip() {
+  local backend_name portals ips_yaml
+
+  # 先清空，保证每次安装都不会残留上次的值
+  sed -i "/^    blockedCIDRs:/,/^  [^ -]/c\\
+    blockedCIDRs: []" "${VALUES_FILE}"
+
+  if [[ "${STORAGE_CLASS}" == "local-storage" ]]; then
+    log_info "Local storage is used, storage.ips has been cleared."
+    return 0
+  fi
+
+  backend_name=$(kubectl get sc "${STORAGE_CLASS}" -o jsonpath='{.parameters.backend}' 2>/dev/null || true)
+  if [[ -z "$backend_name" ]]; then
+    log_warn "No backend found in storageClass=${STORAGE_CLASS}, keep storage.ips empty."
+    return 0
+  fi
+
+  portals=$(kubectl get cm -n kube-system "$backend_name" -o jsonpath='{.data.csi\.json}' 2>/dev/null \
+    | python -c 'import sys,json
+try:
+    d=json.loads(sys.stdin.read())
+    print("\n".join(d.get("backends",{}).get("parameters",{}).get("portals",[])))
+except Exception:
+    pass' 2>/dev/null || true)
+
+  if [[ -z "$portals" ]]; then
+    log_warn "No storage portals found from backend=${backend_name}, keep storage.ips empty."
+    return 0
+  fi
+
+  ips_yaml="      - ${portals//$'\n'/$'\n      - '}"
+
+  sed -i "/^    blockedCIDRs:/c\\
+    blockedCIDRs:\\
+${ips_yaml}" "${VALUES_FILE}"
+
+  log_info "Blocked ips updated to ${VALUES_FILE}."
 }
 
 function create_local_path() {
