@@ -56,6 +56,7 @@ jobs:
           sed -i "s/type: NodePort/type: ClusterIP/g" helm/datamate/values.yaml
           sed -i "s/latest/${{ inputs.version }}/g" helm/datamate/values.yaml
           sed -i 's#HOME_PAGE_URL: *""#HOME_PAGE_URL: "/data/management"#g' helm/datamate/values.yaml
+          sed -i 's/1Gi/10Gi/g' helm/datamate/values.yaml
 
       - name: DeerFlow Package
         if: inputs.deer-flow == true
