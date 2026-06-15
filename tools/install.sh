@@ -182,8 +182,8 @@ function get_blocked_ip() {
   local backend_name portals ips_yaml
 
   # 先清空，保证每次安装都不会残留上次的值
-  sed -i "/^  blockedCIDRs:/,/^  [^ -]/c\\
-  blockedCIDRs: []" "${VALUES_FILE}"
+  sed -i "/^    blockedCIDRs:/,/^  [^ -]/c\\
+    blockedCIDRs: []" "${VALUES_FILE}"
 
   if [[ "${STORAGE_CLASS}" == "local-storage" ]]; then
     log_info "Local storage is used, storage.ips has been cleared."
@@ -209,10 +209,10 @@ except Exception:
     return 0
   fi
 
-  ips_yaml="    - ${portals//$'\n'/$'\n    - '}"
+  ips_yaml="      - ${portals//$'\n'/$'\n      - '}"
 
-  sed -i "/^  blockedCIDRs:/c\\
-  blockedCIDRs:\\
+  sed -i "/^    blockedCIDRs:/c\\
+    blockedCIDRs:\\
 ${ips_yaml}" "${VALUES_FILE}"
 
   log_info "Blocked ips updated to ${VALUES_FILE}."
