@@ -47,11 +47,6 @@ log_error() { echo -e "\033[31m[ERROR]\033[0m $*"; }
 
 random_hex() { head -c 32 /dev/urandom 2>/dev/null | xxd -p -c 64 || openssl rand -hex 32; }
 
-# ========== Check sealed-secrets controller ==========
-log_info "Waiting for sealed-secrets controller..."
-kubectl wait pod -l app.kubernetes.io/instance="${CONTROLLER_NAME}" \
-  -n "${NAMESPACE}" --for=condition=Ready --timeout=120s
-
 # ========== Check kubeseal ==========
 # Test if a binary can actually run on this machine
 ensure_runnable() {
@@ -72,6 +67,41 @@ if [ -z "$KUBESEAL" ] || ! ensure_runnable "$KUBESEAL"; then
   exit 1
 fi
 log_info "Using kubeseal: $KUBESEAL"
+
+# ========== Check sealed-secrets controller ==========
+log_info "Waiting for sealed-secrets controller pod..."
+kubectl wait pod -l app.kubernetes.io/instance="${CONTROLLER_NAME}" \
+  -n "${NAMESPACE}" --for=condition=Ready --timeout=120s
+
+# Extract the controller's public cert from its TLS Secret.
+# The controller creates a kubernetes.io/tls Secret (e.g. "sealed-secrets-keyxxxx")
+# containing tls.crt. Using --cert avoids kubeseal making an HTTPS connection to
+# the controller, which can fail with "tls: failed to find any PEM data in key input"
+# on environments where direct service connectivity is blocked.
+CERT_FILE="${TMP_DIR}/sealed-secrets-cert.pem"
+log_info "Fetching controller cert from TLS secret..."
+for i in $(seq 1 30); do
+    # Find the controller's auto-generated TLS secret (labeled sealedsecrets.bitnami.com/sealed-secrets-key=active)
+    TLS_SECRET=$(kubectl get secret -n "${NAMESPACE}" \
+        -l "sealedsecrets.bitnami.com/sealed-secrets-key=active" \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
+    if [ -n "$TLS_SECRET" ]; then
+        kubectl get secret "$TLS_SECRET" -n "${NAMESPACE}" \
+            -o jsonpath='{.data.tls\.crt}' 2>/dev/null | base64 -d > "$CERT_FILE" || true
+        if [ -s "$CERT_FILE" ] && grep -q "BEGIN CERTIFICATE" "$CERT_FILE"; then
+            log_info "Controller cert extracted from secret/$TLS_SECRET (attempt $i)."
+            break
+        fi
+    fi
+    > "$CERT_FILE"
+    if [ "$i" -eq 30 ]; then
+        log_error "Failed to extract controller cert after 30 attempts."
+        exit 1
+    fi
+    sleep 2
+done
+
+SEAL_ARGS="--cert=${CERT_FILE} -o yaml"
 
 # ========== Secret Collection ==========
 prompt_or_default() {
@@ -124,7 +154,6 @@ if [ "$SKIP_MILVUS" = false ]; then
 fi
 
 # ========== Generate SealedSecret YAML ==========
-SEAL_ARGS="--controller-name=${CONTROLLER_NAME} --controller-namespace=${NAMESPACE} -o yaml"
 
 create_sealed_secret() {
   local secret_name="$1" namespace="$2" output_file="$3"

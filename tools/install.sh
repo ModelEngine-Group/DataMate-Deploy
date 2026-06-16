@@ -318,8 +318,18 @@ function install_milvus() {
     tolerations_args="$HELM_MILVUS_TOLERATIONS"
   fi
   
+  # Read minio credentials from the sealed-secret that generate-sealed-secrets.sh created
+  local minio_access_key=""
+  local minio_secret_key=""
+  minio_access_key=$(kubectl get secret milvus-minio-secret -n "$NAMESPACE" \
+    -o jsonpath='{.data.accesskey}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  minio_secret_key=$(kubectl get secret milvus-minio-secret -n "$NAMESPACE" \
+    -o jsonpath='{.data.secretkey}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  
   # Build helm command with tolerations (string expansion, not array)
   helm_install "milvus" "${HELM_PATH}/milvus" \
+    --set minio.accessKey="${minio_access_key}" \
+    --set minio.secretKey="${minio_secret_key}" \
     --set log.persistence.persistentVolumeClaim.accessModes=ReadWriteOnce \
     $tolerations_args
 }
