@@ -266,7 +266,8 @@ function install_sealed_secrets() {
     exit 1
   fi
   log_info "Installing sealed-secrets controller..."
-  local registry="${REPO:-docker.io}"
+  local registry="${REPO%/}"
+  registry="${registry:-docker.io}"
   
   # Source node isolation args if available
   local tolerations_args=""
