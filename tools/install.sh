@@ -20,6 +20,7 @@
 ###       --skip-load                 Skip loading images.
 ###       --skip-milvus               Skip Milvus installation.
 ###       --skip-push                 Skip pushing images.
+###       --skip-node-setup           Skip node isolation configuration.
 ###   -h, --help                      Show this help message.
 
 set -e
@@ -43,6 +44,7 @@ INSTALL_LABEL_STUDIO=true
 EXECUTE_HAPROXY=true
 DATAMATE_JWT_ENABLE=true
 REAL_IP_MODE=proxy_protocol
+SKIP_NODE_SETUP=false
 
 
 # --- 脚本内部变量 ---
@@ -276,6 +278,7 @@ function get_cert_pass() {
 function helm_install() {
   local release_name="$1"
   local chart_path="$2"
+  shift 2
 
   local helm_args=()
 
@@ -283,6 +286,11 @@ function helm_install() {
   helm_args+=("--install")
   helm_args+=("--namespace" "$NAMESPACE")
   helm_args+=("--create-namespace")
+
+  # Append extra args (e.g., --set key=value)
+  for arg in "$@"; do
+    helm_args+=("$arg")
+  done
 
   log_info "即将执行: helm ${helm_args[*]}"
 
@@ -292,19 +300,113 @@ function helm_install() {
   fi
 }
 
+function install_sealed_secrets() {
+  local chart_tgz
+  chart_tgz=$(ls "${HELM_PATH}/sealed-secrets/sealed-secrets-"*.tgz 2>/dev/null | head -1)
+  if [ -z "$chart_tgz" ]; then
+    log_error "sealed-secrets Helm chart not found in ${HELM_PATH}/sealed-secrets/"
+    exit 1
+  fi
+  log_info "Installing sealed-secrets controller..."
+  local registry="${REPO%/}"
+  registry="${registry:-docker.io}"
+  
+  # Source node isolation args if available
+  local tolerations_args=""
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    tolerations_args="$HELM_SEALED_SECRETS_TOLERATIONS"
+  fi
+  
+  # Build helm command with tolerations (string expansion, not array)
+  helm upgrade --install sealed-secrets "$chart_tgz" \
+    -n "$NAMESPACE" --create-namespace \
+    --set image.registry="${registry}" \
+    --set image.tag=0.27.0 \
+    --set image.pullPolicy=IfNotPresent \
+    --wait --timeout 120s $tolerations_args
+  log_info "sealed-secrets controller installed."
+}
+
 function install_datamate() {
-  helm_install "datamate" "${HELM_PATH}/datamate"
+  local jwt_args=""
+  local node_selector_args=""
+  local tolerations_args=""
+  
+  if [ "$DATAMATE_JWT_ENABLE" == "true" ]; then
+    jwt_args="--set datamate.jwt.enable=true"
+  fi
+  
+  # Source node isolation args if available
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    node_selector_args="$HELM_NODE_SELECTOR_ARGS"
+    tolerations_args="$HELM_TOLERATIONS_ARGS"
+  fi
+  
+  # Build helm command with all args (string expansion, not array)
+  helm_install "datamate" "${HELM_PATH}/datamate" \
+    --set public.secrets.create=false \
+    --set public.persistentVolumeClaim.accessModes=ReadWriteOnce \
+    $jwt_args $node_selector_args $tolerations_args
 }
 
 function install_milvus() {
-  helm_install "milvus" "${HELM_PATH}/milvus"
+  local tolerations_args=""
+  
+  # Source node isolation args if available
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    tolerations_args="$HELM_MILVUS_TOLERATIONS"
+  fi
+  
+  # Read minio credentials from the sealed-secret that generate-sealed-secrets.sh created
+  local minio_access_key=""
+  local minio_secret_key=""
+  minio_access_key=$(kubectl get secret milvus-minio-secret -n "$NAMESPACE" \
+    -o jsonpath='{.data.accesskey}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  minio_secret_key=$(kubectl get secret milvus-minio-secret -n "$NAMESPACE" \
+    -o jsonpath='{.data.secretkey}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  
+  # Build helm command with tolerations (string expansion, not array)
+  helm_install "milvus" "${HELM_PATH}/milvus" \
+    --set minio.accessKey="${minio_access_key}" \
+    --set minio.secretKey="${minio_secret_key}" \
+    --set log.persistence.persistentVolumeClaim.accessModes=ReadWriteOnce \
+    $tolerations_args
 }
 
 function install_label_studio() {
-  helm_install "label-studio" "${HELM_PATH}/label-studio"
+  local tolerations_args=""
+  
+  # Source node isolation args if available
+  if [ -f /tmp/datamate-helm-args.sh ]; then
+    source /tmp/datamate-helm-args.sh
+    tolerations_args="$HELM_LABEL_STUDIO_TOLERATIONS"
+  fi
+  
+  # Build helm command with tolerations (string expansion, not array)
+  helm_install "label-studio" "${HELM_PATH}/label-studio" $tolerations_args
 }
 
 function install() {
+  # 1. Node isolation setup (interactive, optional)
+  if [ "$SKIP_NODE_SETUP" == "false" ]; then
+    log_info "Configuring node isolation (optional)..."
+    bash "${WORK_DIR}/node-setup.sh" --namespace "$NAMESPACE"
+  fi
+
+  # 2. Install sealed-secrets controller
+  install_sealed_secrets
+
+  # 3. Generate sealed secrets (from .env or interactive input)
+  log_info "Generating SealedSecret resources..."
+  bash "${WORK_DIR}/generate-sealed-secrets.sh" \
+    -n "$NAMESPACE" \
+    $([ "$INSTALL_MILVUS" = false ] && echo "--skip-milvus") \
+    $([ "$INSTALL_LABEL_STUDIO" = false ] && echo "--skip-label-studio")
+
+  # 4. Install DataMate components
   install_datamate
   if [ "$INSTALL_MILVUS" == "true" ]; then
     install_milvus
@@ -312,6 +414,9 @@ function install() {
   if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
     install_label_studio
   fi
+  
+  # Cleanup node isolation temp file (all components have sourced it)
+  rm -f /tmp/datamate-helm-args.sh
 }
 
 function add_nginx_route_to_haproxy() {
@@ -364,6 +469,7 @@ function main() {
       --skip-load) SKIP_LOAD=true; shift ;;
       --skip-milvus) INSTALL_MILVUS=false; shift ;;
       --skip-label-studio|--skip-ls) INSTALL_LABEL_STUDIO=false; shift ;;
+      --skip-node-setup) SKIP_NODE_SETUP=true; shift ;;
       --package) PACKAGE_PATH="$2"; shift 2 ;;
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
       --node-port) NODE_PORT="$2"; shift 2 ;;
@@ -376,7 +482,6 @@ function main() {
 
   read_value
   read_storage_value
-  get_cert_pass
   load_images "datamate"
   if [ "$INSTALL_MILVUS" == "true" ]; then
     load_images "milvus"

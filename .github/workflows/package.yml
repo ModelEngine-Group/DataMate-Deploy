@@ -58,6 +58,27 @@ jobs:
           sed -i 's#HOME_PAGE_URL: *""#HOME_PAGE_URL: "/data/management"#g' helm/datamate/values.yaml
           sed -i 's/1Gi/10Gi/g' helm/datamate/values.yaml
 
+      - name: Sealed-Secrets Helm Chart
+        run: |
+          mkdir -p helm/sealed-secrets
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
+          helm pull bitnami/sealed-secrets --version 2.5.19 -d helm/sealed-secrets
+
+      - name: Download kubeseal
+        run: |
+          mkdir -p tools/bin
+          if [ "${{ inputs.aarch }}" = "arm64" ]; then
+            KUBESEAL_ARCH="arm64"
+          else
+            KUBESEAL_ARCH="amd64"
+          fi
+          wget -q "https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.27.2/kubeseal-0.27.2-linux-${KUBESEAL_ARCH}.tar.gz"
+          tar xzf kubeseal-0.27.2-linux-${KUBESEAL_ARCH}.tar.gz kubeseal
+          mv kubeseal tools/bin/kubeseal
+          chmod +x tools/bin/kubeseal
+          rm kubeseal-0.27.2-linux-${KUBESEAL_ARCH}.tar.gz
+
       - name: DeerFlow Package
         if: inputs.deer-flow == true
         run: |
@@ -96,6 +117,10 @@ jobs:
           docker pull quay.io/kuberay/operator:v1.4.2 --platform ${{ inputs.aarch }}
           docker save -o images/datamate/kuberay-operator.tar quay.io/kuberay/operator:v1.4.2
           docker rmi quay.io/kuberay/operator:v1.4.2
+          # Sealed-secrets controller (Docker v2 manifest for offline compat)
+          docker pull bitnami/sealed-secrets-controller:0.27.0 --platform ${{ inputs.aarch }}
+          docker save -o images/datamate/sealed-secrets-controller.tar bitnami/sealed-secrets-controller:0.27.0
+          docker rmi bitnami/sealed-secrets-controller:0.27.0
 
       - name: Download DeerFlow Image
         if: inputs.deer-flow == true
