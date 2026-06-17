@@ -24,13 +24,13 @@ DEFAULT_OLD_SELECTOR="app=edatamate"
 DEFAULT_NEW_SELECTOR="app.kubernetes.io/instance=datamate"
 DEFAULT_NEW_DB_SELECTOR="app.kubernetes.io/name=datamate-database"
 DEFAULT_NEW_FILE_SELECTOR="app.kubernetes.io/name=datamate-backend"
-MIGRATION_REMOTE_DIR="/migrate_export"
+MIGRATION_REMOTE_DIR="/dataset/runtime"
 DATASET_REMOTE_DIR="/dataset"
 
 NAMESPACE="$DEFAULT_NAMESPACE"
 OLD_SELECTOR="$DEFAULT_OLD_SELECTOR"
 OLD_DB_SELECTOR="app=edatamate,tier=backend-db"
-OLD_FILE_SELECTOR="app=edatamate,tier=orchestration"
+OLD_FILE_SELECTOR="app=edatamate,tier=backend"
 NEW_SELECTOR="$DEFAULT_NEW_SELECTOR"
 NEW_DB_SELECTOR="$DEFAULT_NEW_DB_SELECTOR"
 NEW_FILE_SELECTOR="$DEFAULT_NEW_FILE_SELECTOR"
@@ -87,7 +87,7 @@ function set_backup_paths() {
     BACKUP_ROOT="${STATE_DIR}/${NAMESPACE}-backup"
   fi
 
-  LOCAL_EXPORT_DIR="${BACKUP_ROOT}/migrate_export"
+  LOCAL_EXPORT_DIR="${BACKUP_ROOT}/$(basename "$MIGRATION_REMOTE_DIR")"
 }
 
 function init_backup_paths() {
@@ -148,7 +148,8 @@ function copy_remote_migration_to_local() {
   local pod="$1"
 
   mkdir -p "$BACKUP_ROOT"
-  kubectl exec "$pod" -n "$NAMESPACE" -- tar cf - -C / "$(basename "$MIGRATION_REMOTE_DIR")" | tar xf - -C "$BACKUP_ROOT"
+  kubectl exec "$pod" -n "$NAMESPACE" -- \
+    tar cf - -C "$(dirname "$MIGRATION_REMOTE_DIR")" "$(basename "$MIGRATION_REMOTE_DIR")" | tar xf - -C "$BACKUP_ROOT"
 }
 
 function copy_local_migration_to_remote() {

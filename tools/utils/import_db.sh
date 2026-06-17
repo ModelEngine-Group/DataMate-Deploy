@@ -11,7 +11,7 @@ DB_NAME="datamate"
 DB_USER="postgres"
 export PGPASSWORD="$POSTGRES_PASSWORD"
 
-CSV_DIR="/migrate_export"
+CSV_DIR="/dataset/runtime"
 
 # ======================== 函数定义 ========================
 
