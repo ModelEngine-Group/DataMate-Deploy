@@ -7,6 +7,7 @@
 ###
 ### Flags:
 ###       --clean-images            Delete the image of the current version.
+###       --skip-node-cleanup       Skip node label/taint cleanup.
 ###   -h, --help                    help for install.
 ###
 
@@ -14,6 +15,7 @@ NAMESPACE=model-engine
 UNINSTALL_MILVUS=true
 UNINSTALL_LABEL_STUDIO=true
 EXECUTE_HAPROXY=true
+SKIP_NODE_CLEANUP=false
 
 cd "$(dirname "$0")" || exit
 WORK_DIR=$(pwd)
@@ -56,6 +58,12 @@ function uninstall() {
   uninstall_datamate
   [ "$UNINSTALL_MILVUS" == "true" ] && uninstall_milvus
   [ "$UNINSTALL_LABEL_STUDIO" == "true" ] && uninstall_label_studio
+
+  # Optional: cleanup node isolation
+  if [ "$SKIP_NODE_CLEANUP" == "false" ]; then
+    log_info "Cleaning up node labels and taints..."
+    bash "${WORK_DIR}/node-cleanup.sh" --namespace "$NAMESPACE" || true
+  fi
 }
 
 function remove_route_from_haproxy() {
@@ -106,6 +114,7 @@ function main() {
       -n|--ns|--namespace) NAMESPACE="$2"; shift 2 ;;
       --skip-haproxy) EXECUTE_HAPROXY=false; shift ;;
       --skip-label-studio|--skip-ls) UNINSTALL_LABEL_STUDIO=false; shift ;;
+      --skip-node-cleanup) SKIP_NODE_CLEANUP=true; shift ;;
       -h|--help) print_help "${SCRIPT_PATH}"; exit 0 ;;
       *) log_info "错误: 未知参数: $1"; shift ;;
     esac
