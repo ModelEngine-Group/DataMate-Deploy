@@ -4,7 +4,7 @@
 # =============================================================================
 # 功能：从旧版本PostgreSQL导出数据到CSV，生成UUID映射关系
 # 执行环境：有psql命令的环境（A环境）
-# 输出：migrate_export/ 目录下的CSV文件
+# 输出：/dataset/runtime/ 目录下的CSV文件
 # =============================================================================
 
 set -e
@@ -19,7 +19,7 @@ DB_USER="postgres"
 export PGPASSWORD="$(source /kmc/kmc-adapter/kmc_encrypt_decrypt_tool.sh && kmc_decrypt $POSTGRES_PASSWORD modelenginepublic)"
 
 # 导出目录
-EXPORT_DIR="/migrate_export"
+EXPORT_DIR="/dataset/runtime"
 
 # ======================== 函数定义 ========================
 
