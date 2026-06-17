@@ -232,6 +232,7 @@ function wait_new_database_ready() {
 }
 
 function export_old_data() {
+  delete_backup_files
   init_backup_paths
 
   local old_db_pod
