@@ -12,21 +12,23 @@
 
 ## 开始升级
 
+1. 执行DataMate升级命令
 ```bash
 # 进入安装包解压后目录
 bash tools/upgrade.sh -n model-engine --repo <镜像仓库地址> --port <自定义端口号> --sc <存储类名称>
 ```
 
-`upgrade.sh` 通过内置标签识别旧版本资源、迁移 Pod 和新版本 Pod。除升级脚本自身参数外，已支持的安装参数会透传给 `install.sh`。
+其中，自定义端口号建议为ModelEngine访问的前端端口号+1，执行命令时需要输入镜像仓库密码。`upgrade.sh` 通过内置标签识别旧版本资源、迁移 Pod 和新版本 Pod。除升级脚本自身参数外，已支持的安装参数会透传给 `install.sh`。
+**若该命令执行失败，请先参考[回滚说明](#回滚说明)执行回滚命令，再重新执行升级命令。**
 
-通过terrabase指定datamate端口号，进入terrabase安装目录执行如下命令：
-其中ip为《ModelEngine 25.1.0 安装部署指南》5.4.1步骤1设置的弹性ip地址，端口为上一步中自定义的datamate访问的前端端口号，建议为ModelEngine访问的前端端口号+1，sc为部署ME时使用的存储类
+2. 通过terrabase指定datamate端口号，进入terrabase升级包路径（默认/opt/k8s/model-engine-upgrade/terraBase）执行如下命令：
+其中前端访问端口号根据访问地址是否使用业务面浮动IP，将值设置为管理面浮动IP或业务面浮动IP
 ```bash
 bash tools/install.sh --install \
   --ns model-engine \
-  --repo https://registry.example.com/ \
-  --sc sc-system-manage \
-  --datamate https://<ip>:<port>
+  --repo <镜像仓库地址> \
+  --sc <存储类名称> \
+  --datamate https://<前端访问端口号>:<自定义端口号>
 ```
 
 ## 参数说明
