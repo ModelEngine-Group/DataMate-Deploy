@@ -21,7 +21,21 @@ cd tools
 ./install.sh --repo <镜像仓库地址> -n model-engine
 ```
 
-执行时需要输入镜像仓库密码。
+安装过程中会交互式提示输入以下信息：
+
+| 步骤 | 提示 | 说明 |
+|------|------|------|
+| 镜像仓库密码 | `Enter your registry password:` | 如果未跳过镜像加载/推送 |
+| 节点隔离 | `Configure dedicated nodes?` | 可选，按回车跳过 |  
+| 数据库密码 | `Enter database password:` | 必填，DB_PASSWORD |
+| 证书密码 | `Enter SSL certificate password (enter to skip):` | 可选，按回车跳过 |
+| 域名 | `Enter domain (enter to skip):` | 可选，按回车跳过 |
+| JWT 密钥 | 自动生成 | 无需手动输入 |
+| Label Studio 密码 | `Enter Label Studio admin password (enter to skip):` | 可选，按回车跳过 |
+| Label Studio Token | 自动生成 | 无需手动输入 |
+| MinIO 密钥 | 自动生成 | 无需手动输入（Milvus 模式） |
+
+> **注意：** `POSTGRE_PASSWORD` 自动使用 `DB_PASSWORD`，无需单独输入。
 
 ### 完整安装（包含 Milvus 和 Label Studio）
 
@@ -116,8 +130,9 @@ bash ./install.sh --install \
 | `--node-port` | NodePort 端口 | - |
 | `--operator` | operator pvc 容量 | - |
 | `--dataset` | dataset pvc 容量 | - |
-| `--path` | 本地存储主机路径（local-storage 时使用） | - |
+| `--path` | 本地存储主机路径（local-storage 时使用） | /opt/k8s/<namespace> |
 | `--package` | 部署包文件路径 | - |
+| `--real-ip-mode` | 真实 IP 转发模式（off / proxy_protocol） | proxy_protocol |
 
 ### 功能开关参数
 
@@ -128,6 +143,8 @@ bash ./install.sh --install \
 | `--skip-milvus` | 跳过 Milvus 安装 |
 | `--skip-label-studio` / `--skip-ls` | 跳过 Label Studio 安装 |
 | `--skip-haproxy` | 跳过 HAProxy 配置 |
+| `--skip-node-setup` | 跳过节点隔离配置 |
+| `--disable-jwt` | 禁用 JWT 用户数据隔离 |
 | `-h, --help` | 显示帮助信息 |
 
 ## 安装模式
@@ -159,6 +176,8 @@ bash ./install.sh --install \
 - milvus/minio
 - milvus/milvus
 - milvus/milvus-log
+- label-studio/data
+- label-studio/dataset
 
 ### 3. 使用 NodePort 暴露服务
 
@@ -212,14 +231,16 @@ bash ./install.sh --install \
 脚本会按以下顺序执行：
 
 1. **配置解析**：读取命令行参数
-2. **配置写入**：更新 values.yaml 配置文件
-3. **存储配置**：创建必要的本地存储目录（如使用 local-storage）
-4. **证书获取**：从现有部署中获取证书密码（如存在）
-5. **镜像处理**：加载并推送镜像到镜像仓库
-6. **Helm 安装**：使用 Helm 部署各组件
-7. **路由配置**：配置 HAProxy 路由规则（如未跳过）
-8. **等待就绪**：等待所有 Pod 进入 Ready 状态
-9. **算子安装**：加载自定义算子包（如指定）
+2. **配置写入**：更新 values.yaml 配置文件（命名空间、镜像仓库、存储类等）
+3. **存储配置**：创建必要的本地存储目录并设置权限（如使用 local-storage）
+4. **镜像处理**：加载并推送镜像到镜像仓库
+5. **节点隔离**：交互式配置节点标签和污点（可选，`--skip-node-setup` 跳过）
+6. **Sealed Secrets 控制器**：安装 sealed-secrets controller
+7. **密钥生成**：交互式收集密钥并生成 SealedSecret 资源
+8. **Helm 安装**：依次部署 DataMate、Milvus、Label Studio
+9. **路由配置**：配置 HAProxy 路由规则（如未跳过）
+10. **等待就绪**：等待所有 Pod 进入 Ready 状态（最长 300 秒）
+11. **算子安装**：加载自定义算子包（如指定）
 
 ## 访问服务
 
@@ -256,6 +277,10 @@ kubectl get pvc -n model-engine
 
 检查镜像仓库地址和密码是否正确，网络是否可达。
 
+### Sealed Secrets 安装失败
+
+使用私有 registry 时可能出现 `allowInsecureImages` 错误，已被安装脚本自动处理。如仍有问题，检查 sealed-secrets chart 包是否存在于 `helm/sealed-secrets/` 目录。
+
 ### Pod 无法启动
 
 ```bash
@@ -266,6 +291,10 @@ kubectl logs <pod-name> -n model-engine
 ### PVC 无法绑定
 
 检查存储类是否配置正确，集群是否有足够的存储资源。
+
+### Label Studio 挂载失败
+
+使用 local-storage 时，确保宿主机目录已创建且有正确权限。如遇 `/label-studio/data/media` permission denied，请确认安装时 `mkdir -p` 和 `chmod` 已正确执行。
 
 ### HAProxy 配置失败
 
@@ -282,20 +311,27 @@ kubectl logs <pod-name> -n model-engine
 ### 卸载
 
 ```bash
-helm uninstall datamate -n model-engine
-helm uninstall milvus -n model-engine
-helm uninstall label-studio -n model-engine
+# 卸载 Helm releases
+helm uninstall label-studio -n model-engine --ignore-not-found
+helm uninstall milvus -n model-engine --ignore-not-found
+helm uninstall datamate -n model-engine --ignore-not-found
 
-kubectl delete ns model-engine
+# 清理 local-storage PV（如有残留）
+kubectl delete pv label-studio-data-pv label-studio-dataset-pv --ignore-not-found
+
+# 删除命名空间
+kubectl delete ns model-engine --ignore-not-found
 ```
 
 ## 注意事项
 
 1. 使用本地存储（local-storage）时，请确保节点有足够的磁盘空间
-2. 如果目录已存在且包含数据，脚本会提示确认是否删除
-3. 镜像仓库密码不会被存储，仅用于本次安装
-4. 安装过程会等待最多 300 秒让所有 Pod 就绪
-5. 建议在测试环境先验证配置后再在生产环境部署
+2. Label Studio 使用三方镜像，local-storage 模式下脚本会自动创建目录并设置 777 权限
+3. 如果目录已存在且包含数据，脚本会提示确认是否删除
+4. 镜像仓库密码不会被存储，仅用于本次安装
+5. 安装过程会等待最多 300 秒让所有 Pod 就绪
+6. 重装前建议先清理旧的 PV/PVC（尤其是 label-studio），避免路径冲突
+7. 建议在测试环境先验证配置后再在生产环境部署
 
 ## 帮助与支持
 
