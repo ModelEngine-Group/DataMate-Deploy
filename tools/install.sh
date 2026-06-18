@@ -202,6 +202,7 @@ function read_storage_value() {
       cd "$STORAGE_PATH/label-studio" || exit
       dirs=(data dataset)
       create_local_path "${dirs[@]}"
+      chmod -R 777 "$STORAGE_PATH/label-studio/data" "$STORAGE_PATH/label-studio/dataset"
       cd -  >/dev/null || exit
     fi
   fi
