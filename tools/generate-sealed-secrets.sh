@@ -132,18 +132,15 @@ log_info "Collecting secrets..."
 # DataMate core secrets
 prompt_or_default DB_PASSWORD "database password" false
 prompt_or_default CERT_PASS "SSL certificate password (enter to skip)" false
-prompt_or_default DOMAIN "domain" false
+prompt_or_default DOMAIN "domain (enter to skip)" false
 HOME_PAGE_URL="${HOME_PAGE_URL:-/data/management}"
 prompt_or_default JWT_SECRET "JWT secret" true
 
 # Label Studio secrets
 if [ "$SKIP_LABEL_STUDIO" = false ]; then
-  prompt_or_default LABEL_STUDIO_PASSWORD "Label Studio admin password" false
-  prompt_or_default POSTGRE_PASSWORD "Label Studio PostgreSQL password (same as DB_PASSWORD)" false
-  if [ -z "$POSTGRE_PASSWORD" ] && [ -n "$DB_PASSWORD" ]; then
-    POSTGRE_PASSWORD="$DB_PASSWORD"
-    log_info "Using DB_PASSWORD as POSTGRE_PASSWORD"
-  fi
+  prompt_or_default LABEL_STUDIO_PASSWORD "Label Studio admin password (enter to skip)" false
+  POSTGRE_PASSWORD="$DB_PASSWORD"
+  log_info "Using DB_PASSWORD as POSTGRE_PASSWORD"
   prompt_or_default LABEL_STUDIO_USER_TOKEN "Label Studio API token" true
 fi
 

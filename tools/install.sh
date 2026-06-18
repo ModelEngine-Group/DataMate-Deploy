@@ -100,6 +100,19 @@ function read_value() {
     fi
   fi
 
+  # Fix label-studio image repo: values.yaml defaults to heartexlabs/label-studio,
+  # but the packaged image is datamate/datamate-label-studio.
+  if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+    sed -i "s#repository: heartexlabs/label-studio#repository: datamate/datamate-label-studio#" "$LABEL_STUDIO_VALUES_FILE"
+    # Fix label-studio image tag: values.yaml defaults to "latest",
+    # but the packaged image has a specific version tag.
+    IMAGE_TAG=$(grep -oP 'tag:\s*"\K[^"]+' "$VALUES_FILE" | head -1)
+    if [ -n "$IMAGE_TAG" ]; then
+      sed -i "/^image:/,/pgbouncer:/{s/tag: \".*\"/tag: \"$IMAGE_TAG\"/}" "$LABEL_STUDIO_VALUES_FILE"
+      log_info "Set label-studio image tag to $IMAGE_TAG"
+    fi
+  fi
+
   if [ -n "$OPERATOR_PVC" ]; then
     sed -i "s/^\(\s*${OPERATOR_PVC_KEY}:\s*\).*/\1${OPERATOR_PVC}/" "$VALUES_FILE"
   fi
@@ -125,7 +138,12 @@ function read_value() {
       STORAGE_NODE=$(hostname | tr '[:upper:]' '[:lower:]')
     fi
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$VALUES_FILE"
+  fi
+  if [ "$STORAGE_CLASS" == "local-storage" ] && [ -n "$STORAGE_NODE" ]; then
     sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$MILVUS_VALUES_FILE"
+    if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+      sed -i "s/^\(\s*${STORAGE_NODE_KEY}:*\).*/\1 ${STORAGE_NODE}/" "$LABEL_STUDIO_VALUES_FILE"
+    fi
   fi
 
   if [ -n "$NODE_PORT" ]; then
@@ -158,6 +176,9 @@ function read_storage_value() {
       STORAGE_PATH="/opt/k8s/$NAMESPACE"
       sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/datamate#" "$VALUES_FILE"
       sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/milvus#" "$MILVUS_VALUES_FILE"
+      if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+        sed -i "s#storagePath:.*#storagePath: $STORAGE_PATH/label-studio#" "$LABEL_STUDIO_VALUES_FILE"
+      fi
     else
       mkdir -p "$STORAGE_PATH"
       STORAGE_PATH=$(realpath "$STORAGE_PATH/../")
@@ -173,6 +194,15 @@ function read_storage_value() {
       cd "$STORAGE_PATH/milvus" || exit
       dirs=(etcd minio milvus milvus-log)
       create_local_path "${dirs[@]}"
+      cd -  >/dev/null || exit
+    fi
+
+    if [ "$INSTALL_LABEL_STUDIO" == "true" ]; then
+      mkdir -p "$STORAGE_PATH/label-studio"
+      cd "$STORAGE_PATH/label-studio" || exit
+      dirs=(data dataset)
+      create_local_path "${dirs[@]}"
+      chmod -R 777 "$STORAGE_PATH/label-studio/data" "$STORAGE_PATH/label-studio/dataset"
       cd -  >/dev/null || exit
     fi
   fi
@@ -324,6 +354,7 @@ function install_sealed_secrets() {
     --set image.registry="${registry}" \
     --set image.tag=0.27.0 \
     --set image.pullPolicy=IfNotPresent \
+    --set global.security.allowInsecureImages=true \
     --wait --timeout 120s $tolerations_args
   log_info "sealed-secrets controller installed."
 }
