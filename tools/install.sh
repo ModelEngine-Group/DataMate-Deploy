@@ -354,6 +354,7 @@ function install_sealed_secrets() {
     --set image.registry="${registry}" \
     --set image.tag=0.27.0 \
     --set image.pullPolicy=IfNotPresent \
+    --set global.security.allowInsecureImages=true \
     --wait --timeout 120s $tolerations_args
   log_info "sealed-secrets controller installed."
 }
