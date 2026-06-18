@@ -45,7 +45,6 @@ jobs:
           owner: ModelEngine-Group
           repository: 'DataMate'
           access-token: ${{ secrets.ACCESS_TOKEN }}
-          branch: fix/deploy
 
       - name: DataMate Package
         run: |
