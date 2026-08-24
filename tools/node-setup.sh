@@ -298,7 +298,6 @@ interactive_selection() {
 export HELM_NODE_SELECTOR_ARGS=""
 export HELM_TOLERATIONS_ARGS=""
 export HELM_MILVUS_TOLERATIONS=""
-export HELM_SEALED_SECRETS_TOLERATIONS=""
 export HELM_LABEL_STUDIO_TOLERATIONS=""
 EOF
                 exit 0
@@ -390,12 +389,6 @@ generate_helm_args() {
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string minio.tolerations[0].value=${LABEL_VALUE}"
         HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS --set-string minio.tolerations[0].effect=${TAINT_EFFECT}"
         
-        # Sealed-secrets-specific tolerations (same format as Milvus)
-        HELM_SEALED_SECRETS_TOLERATIONS="--set-string tolerations[0].key=${LABEL_KEY}"
-        HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].operator=Equal"
-        HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].value=${LABEL_VALUE}"
-        HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS --set-string tolerations[0].effect=${TAINT_EFFECT}"
-        
         # Label-studio tolerations (app + pgbouncer)
         HELM_LABEL_STUDIO_TOLERATIONS="--set-string tolerations[0].key=${LABEL_KEY}"
         HELM_LABEL_STUDIO_TOLERATIONS="$HELM_LABEL_STUDIO_TOLERATIONS --set-string tolerations[0].operator=Equal"
@@ -443,7 +436,6 @@ generate_helm_args() {
     else
         HELM_TOLERATIONS_ARGS=""
         HELM_MILVUS_TOLERATIONS=""
-        HELM_SEALED_SECRETS_TOLERATIONS=""
         HELM_LABEL_STUDIO_TOLERATIONS=""
     fi
 
@@ -453,7 +445,6 @@ generate_helm_args() {
 export HELM_NODE_SELECTOR_ARGS="$HELM_NODE_SELECTOR_ARGS"
 export HELM_TOLERATIONS_ARGS="$HELM_TOLERATIONS_ARGS"
 export HELM_MILVUS_TOLERATIONS="$HELM_MILVUS_TOLERATIONS"
-export HELM_SEALED_SECRETS_TOLERATIONS="$HELM_SEALED_SECRETS_TOLERATIONS"
 export HELM_LABEL_STUDIO_TOLERATIONS="$HELM_LABEL_STUDIO_TOLERATIONS"
 EOF
 }
@@ -499,7 +490,6 @@ main() {
 export HELM_NODE_SELECTOR_ARGS=""
 export HELM_TOLERATIONS_ARGS=""
 export HELM_MILVUS_TOLERATIONS=""
-export HELM_SEALED_SECRETS_TOLERATIONS=""
 export HELM_LABEL_STUDIO_TOLERATIONS=""
 EOF
         exit 0

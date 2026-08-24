@@ -59,6 +59,15 @@ PORT="30000"
 NODE_PORT=""
 ADDRESS_TYPE="management"
 PACKAGE_PATH=""
+# --- 密钥（由 read_secrets 收集；datamate/label-studio 经 sed 写回 values.yaml，milvus 经 --set 注入） ---
+DB_PASSWORD=""
+CERT_PASS=""
+DOMAIN=""
+JWT_SECRET=""
+LABEL_STUDIO_PASSWORD=""
+LABEL_STUDIO_USER_TOKEN=""
+MINIO_ACCESS_KEY=""
+MINIO_SECRET_KEY=""
 
 
 cd "$(dirname "$0")" || exit
@@ -293,6 +302,75 @@ function create_local_path() {
   done
 }
 
+function random_hex() {
+  head -c 32 /dev/urandom 2>/dev/null | xxd -p -c 64 || openssl rand -hex 32
+}
+
+function read_secret() {
+  local var_name="$1" prompt="$2" gen_random="$3"
+  if [ "$gen_random" = true ]; then
+    eval "$var_name=\$(random_hex)"
+    log_info "Auto-generated ${var_name}"
+    return 0
+  fi
+  read -rsp "Enter ${prompt}: " value
+  echo ""
+  eval "$var_name=\"$value\""
+}
+
+# Rewrite key: lines in values.yaml in place.
+# Use # as sed delimiter to tolerate slashes; escape & # backslash so Huawei@321 won't break replacement.
+function sed_kv() {
+  local file="$1" key="$2" value="$3"
+  local esc="${value//\\/\\\\}"
+  esc="${esc//&/\\&}"
+  esc="${esc//#/\\#}"
+  sed -i "s#^\(\s*${key}:\s*\).*#\1\"${esc}\"#" "$file"
+}
+
+# Write collected secrets back to each chart values.yaml via sed (not --set).
+# milvus accessKey/secretKey appear twice in values.yaml, sed would corrupt them, so milvus stays --set.
+function write_secrets_to_values() {
+  sed_kv "$VALUES_FILE" DB_PASSWORD "$DB_PASSWORD"
+  sed_kv "$VALUES_FILE" CERT_PASS "$CERT_PASS"
+  sed_kv "$VALUES_FILE" DOMAIN "$DOMAIN"
+  sed_kv "$VALUES_FILE" JWT_SECRET "$JWT_SECRET"
+  sed_kv "$VALUES_FILE" LABEL_STUDIO_PASSWORD "$LABEL_STUDIO_PASSWORD"
+  sed_kv "$VALUES_FILE" LABEL_STUDIO_USER_TOKEN "$LABEL_STUDIO_USER_TOKEN"
+  log_info "DataMate secrets written to ${VALUES_FILE}"
+  if [ "$INSTALL_LABEL_STUDIO" = true ]; then
+    sed_kv "$LABEL_STUDIO_VALUES_FILE" existingSecret ""
+    sed_kv "$LABEL_STUDIO_VALUES_FILE" POSTGRE_PASSWORD "$DB_PASSWORD"
+    sed_kv "$LABEL_STUDIO_VALUES_FILE" LABEL_STUDIO_PASSWORD "$LABEL_STUDIO_PASSWORD"
+    sed_kv "$LABEL_STUDIO_VALUES_FILE" LABEL_STUDIO_USER_TOKEN "$LABEL_STUDIO_USER_TOKEN"
+    log_info "Label Studio secrets written to ${LABEL_STUDIO_VALUES_FILE}"
+  fi
+}
+function read_secrets() {
+  log_info "Collecting secrets..."
+  # CERT_PASS: 优先从 oms Pod 经 kmc 自动获取，失败则回退交互输入
+  get_cert_pass
+  if [ -z "$CERT_PASS" ]; then
+    read_secret CERT_PASS "SSL certificate password (enter to skip)" false
+  fi
+  # DB_PASSWORD: 必填，空输入会重新提示
+  while [ -z "$DB_PASSWORD" ]; do
+    read_secret DB_PASSWORD "database password (required)" false
+  done
+  read_secret DOMAIN "domain (enter to skip)" false
+  read_secret JWT_SECRET "JWT secret" true
+  if [ "$INSTALL_LABEL_STUDIO" = true ]; then
+    read_secret LABEL_STUDIO_PASSWORD "Label Studio admin password (enter to skip)" false
+    read_secret LABEL_STUDIO_USER_TOKEN "Label Studio API token" true
+  fi
+  if [ "$INSTALL_MILVUS" = true ]; then
+    read_secret MINIO_ACCESS_KEY "MinIO access key" true
+    read_secret MINIO_SECRET_KEY "MinIO secret key" true
+  fi
+  # write secrets back to values.yaml via sed (original method)
+  write_secrets_to_values
+}
+
 function get_cert_pass() {
     local POD_NAME
     POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l app=oms --no-headers | awk '{print $1}')
@@ -300,10 +378,9 @@ function get_cert_pass() {
     if [ -z "$POD_NAME" ]; then
         return
     else
-        cert_pass=$(kubectl exec -i -n "$NAMESPACE" "$POD_NAME" -- bash -c \
+        CERT_PASS=$(kubectl exec -i -n "$NAMESPACE" "$POD_NAME" -- bash -c \
           'source /opt/huawei/fce/runtime/common/kmc_encrypt_decrypt_tool.sh &&
           kmc_decrypt $(grep "^nginx=" /opt/huawei/fce/runtime/security/priv/nginx.conf | cut -d "=" -f 2-) nginx')
-        sed -i "s/CERT_PASS:.*/CERT_PASS: \"$cert_pass\"/" "$VALUES_FILE"
     fi
 }
 
@@ -332,35 +409,6 @@ function helm_install() {
   fi
 }
 
-function install_sealed_secrets() {
-  local chart_tgz
-  chart_tgz=$(ls "${HELM_PATH}/sealed-secrets/sealed-secrets-"*.tgz 2>/dev/null | head -1)
-  if [ -z "$chart_tgz" ]; then
-    log_error "sealed-secrets Helm chart not found in ${HELM_PATH}/sealed-secrets/"
-    exit 1
-  fi
-  log_info "Installing sealed-secrets controller..."
-  local registry="${REPO%/}"
-  registry="${registry:-docker.io}"
-  
-  # Source node isolation args if available
-  local tolerations_args=""
-  if [ -f /tmp/datamate-helm-args.sh ]; then
-    source /tmp/datamate-helm-args.sh
-    tolerations_args="$HELM_SEALED_SECRETS_TOLERATIONS"
-  fi
-  
-  # Build helm command with tolerations (string expansion, not array)
-  helm upgrade --install sealed-secrets "$chart_tgz" \
-    -n "$NAMESPACE" --create-namespace \
-    --set image.registry="${registry}" \
-    --set image.tag=0.27.0 \
-    --set image.pullPolicy=IfNotPresent \
-    --set global.security.allowInsecureImages=true \
-    --wait --timeout 120s $tolerations_args
-  log_info "sealed-secrets controller installed."
-}
-
 function install_datamate() {
   local jwt_args=""
   local node_selector_args=""
@@ -378,8 +426,10 @@ function install_datamate() {
   fi
   
   # Build helm command with all args (string expansion, not array)
+  # datamate-conf Secret is created by chart secret.yaml from values.yaml secrets.data;
+  # secrets already written to values.yaml by write_secrets_to_values() via sed, no --set-string needed.
   helm_install "datamate" "${HELM_PATH}/datamate" \
-    --set public.secrets.create=false \
+    --set public.secrets.create=true \
     --set public.persistentVolumeClaim.accessModes=ReadWriteOnce \
     $jwt_args $node_selector_args $tolerations_args
 }
@@ -393,18 +443,11 @@ function install_milvus() {
     tolerations_args="$HELM_MILVUS_TOLERATIONS"
   fi
   
-  # Read minio credentials from the sealed-secret that generate-sealed-secrets.sh created
-  local minio_access_key=""
-  local minio_secret_key=""
-  minio_access_key=$(kubectl get secret milvus-minio-secret -n "$NAMESPACE" \
-    -o jsonpath='{.data.accesskey}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
-  minio_secret_key=$(kubectl get secret milvus-minio-secret -n "$NAMESPACE" \
-    -o jsonpath='{.data.secretkey}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
-  
-  # Build helm command with tolerations (string expansion, not array)
+  # milvus accessKey/secretKey appear twice in values.yaml, sed would corrupt them, so keep --set.
   helm_install "milvus" "${HELM_PATH}/milvus" \
-    --set minio.accessKey="${minio_access_key}" \
-    --set minio.secretKey="${minio_secret_key}" \
+    --set minio.existingSecret="" \
+    --set-string minio.accessKey="${MINIO_ACCESS_KEY}" \
+    --set-string minio.secretKey="${MINIO_SECRET_KEY}" \
     --set log.persistence.persistentVolumeClaim.accessModes=ReadWriteOnce \
     $tolerations_args
 }
@@ -419,7 +462,10 @@ function install_label_studio() {
   fi
   
   # Build helm command with tolerations (string expansion, not array)
-  helm_install "label-studio" "${HELM_PATH}/label-studio" $tolerations_args
+  # Label Studio secrets already written to values.yaml by write_secrets_to_values() via sed
+  # (existingSecret empty triggers deployment.yaml else value: branch), no --set-string needed.
+  helm_install "label-studio" "${HELM_PATH}/label-studio" \
+    $tolerations_args
 }
 
 function install() {
@@ -429,17 +475,10 @@ function install() {
     bash "${WORK_DIR}/node-setup.sh" --namespace "$NAMESPACE"
   fi
 
-  # 2. Install sealed-secrets controller
-  install_sealed_secrets
+  # 2. Collect secrets (interactive / kmc auto-fetch / random)
+  read_secrets
 
-  # 3. Generate sealed secrets (from .env or interactive input)
-  log_info "Generating SealedSecret resources..."
-  bash "${WORK_DIR}/generate-sealed-secrets.sh" \
-    -n "$NAMESPACE" \
-    $([ "$INSTALL_MILVUS" = false ] && echo "--skip-milvus") \
-    $([ "$INSTALL_LABEL_STUDIO" = false ] && echo "--skip-label-studio")
-
-  # 4. Install DataMate components
+  # 3. Install DataMate components
   install_datamate
   if [ "$INSTALL_MILVUS" == "true" ]; then
     install_milvus

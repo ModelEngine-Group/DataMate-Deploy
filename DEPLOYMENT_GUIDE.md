@@ -235,12 +235,11 @@ bash ./install.sh --install \
 3. **存储配置**：创建必要的本地存储目录并设置权限（如使用 local-storage）
 4. **镜像处理**：加载并推送镜像到镜像仓库
 5. **节点隔离**：交互式配置节点标签和污点（可选，`--skip-node-setup` 跳过）
-6. **Sealed Secrets 控制器**：安装 sealed-secrets controller
-7. **密钥生成**：交互式收集密钥并生成 SealedSecret 资源
-8. **Helm 安装**：依次部署 DataMate、Milvus、Label Studio
-9. **路由配置**：配置 HAProxy 路由规则（如未跳过）
-10. **等待就绪**：等待所有 Pod 进入 Ready 状态（最长 300 秒）
-11. **算子安装**：加载自定义算子包（如指定）
+6. **密钥收集**：交互式收集密钥（DB 密码等用户输入，token/MinIO 密钥自动随机，CERT_PASS 经 kmc 自动获取）并经 sed 写入 values.yaml
+7. **Helm 安装**：依次部署 DataMate、Milvus、Label Studio
+8. **路由配置**：配置 HAProxy 路由规则（如未跳过）
+9. **等待就绪**：等待所有 Pod 进入 Ready 状态（最长 300 秒）
+10. **算子安装**：加载自定义算子包（如指定）
 
 ## 访问服务
 
@@ -276,10 +275,6 @@ kubectl get pvc -n model-engine
 ### 镜像加载失败
 
 检查镜像仓库地址和密码是否正确，网络是否可达。
-
-### Sealed Secrets 安装失败
-
-使用私有 registry 时可能出现 `allowInsecureImages` 错误，已被安装脚本自动处理。如仍有问题，检查 sealed-secrets chart 包是否存在于 `helm/sealed-secrets/` 目录。
 
 ### Pod 无法启动
 

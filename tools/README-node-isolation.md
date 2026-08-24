@@ -223,7 +223,7 @@ tools/
 ### Integration Points
 
 **install.sh:**
-- Line 309-313: Node setup call before sealed-secrets installation
+- Node setup call before Helm installation (sealed-secrets removed)
 - Line 275-285: Helm args sourcing in install_datamate()
 - Line 384: `--skip-node-setup` flag handler
 
