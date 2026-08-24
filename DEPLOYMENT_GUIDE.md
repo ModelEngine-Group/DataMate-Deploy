@@ -30,11 +30,10 @@ cd tools
 | 数据库密码 | `Enter database password:` | 必填，DB_PASSWORD |
 | 证书密码 | `Enter SSL certificate password (enter to skip):` | 可选，按回车跳过 |
 | JWT 密钥 | 自动生成 | 无需手动输入 |
-| Label Studio 密码 | `Enter Label Studio admin password (enter to skip):` | 可选，按回车跳过 |
 | Label Studio Token | 自动生成 | 无需手动输入 |
 | MinIO 密钥 | 自动生成 | 无需手动输入（Milvus 模式） |
 
-> **注意：** `POSTGRE_PASSWORD` 自动使用 `DB_PASSWORD`，无需单独输入。
+> **注意：** `POSTGRE_PASSWORD` 和 `LABEL_STUDIO_PASSWORD` 自动使用 `DB_PASSWORD`，无需单独输入。
 
 ### 完整安装（包含 Milvus 和 Label Studio）
 

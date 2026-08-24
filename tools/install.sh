@@ -63,7 +63,6 @@ PACKAGE_PATH=""
 DB_PASSWORD=""
 CERT_PASS=""
 JWT_SECRET=""
-LABEL_STUDIO_PASSWORD=""
 LABEL_STUDIO_USER_TOKEN=""
 MINIO_ACCESS_KEY=""
 MINIO_SECRET_KEY=""
@@ -333,13 +332,13 @@ function write_secrets_to_values() {
   sed_kv "$VALUES_FILE" DB_PASSWORD "$DB_PASSWORD"
   sed_kv "$VALUES_FILE" CERT_PASS "$CERT_PASS"
   sed_kv "$VALUES_FILE" JWT_SECRET "$JWT_SECRET"
-  sed_kv "$VALUES_FILE" LABEL_STUDIO_PASSWORD "$LABEL_STUDIO_PASSWORD"
+  sed_kv "$VALUES_FILE" LABEL_STUDIO_PASSWORD "$DB_PASSWORD"
   sed_kv "$VALUES_FILE" LABEL_STUDIO_USER_TOKEN "$LABEL_STUDIO_USER_TOKEN"
   log_info "DataMate secrets written to ${VALUES_FILE}"
   if [ "$INSTALL_LABEL_STUDIO" = true ]; then
     sed_kv "$LABEL_STUDIO_VALUES_FILE" existingSecret ""
     sed_kv "$LABEL_STUDIO_VALUES_FILE" POSTGRE_PASSWORD "$DB_PASSWORD"
-    sed_kv "$LABEL_STUDIO_VALUES_FILE" LABEL_STUDIO_PASSWORD "$LABEL_STUDIO_PASSWORD"
+    sed_kv "$LABEL_STUDIO_VALUES_FILE" LABEL_STUDIO_PASSWORD "$DB_PASSWORD"
     sed_kv "$LABEL_STUDIO_VALUES_FILE" LABEL_STUDIO_USER_TOKEN "$LABEL_STUDIO_USER_TOKEN"
     log_info "Label Studio secrets written to ${LABEL_STUDIO_VALUES_FILE}"
   fi
@@ -357,7 +356,6 @@ function read_secrets() {
   done
   read_secret JWT_SECRET "JWT secret" true
   if [ "$INSTALL_LABEL_STUDIO" = true ]; then
-    read_secret LABEL_STUDIO_PASSWORD "Label Studio admin password (enter to skip)" false
     read_secret LABEL_STUDIO_USER_TOKEN "Label Studio API token" true
   fi
   if [ "$INSTALL_MILVUS" = true ]; then
