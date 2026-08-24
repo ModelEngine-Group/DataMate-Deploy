@@ -62,7 +62,6 @@ PACKAGE_PATH=""
 # --- 密钥（由 read_secrets 收集；datamate/label-studio 经 sed 写回 values.yaml，milvus 经 --set 注入） ---
 DB_PASSWORD=""
 CERT_PASS=""
-DOMAIN=""
 JWT_SECRET=""
 LABEL_STUDIO_PASSWORD=""
 LABEL_STUDIO_USER_TOKEN=""
@@ -333,7 +332,6 @@ function sed_kv() {
 function write_secrets_to_values() {
   sed_kv "$VALUES_FILE" DB_PASSWORD "$DB_PASSWORD"
   sed_kv "$VALUES_FILE" CERT_PASS "$CERT_PASS"
-  sed_kv "$VALUES_FILE" DOMAIN "$DOMAIN"
   sed_kv "$VALUES_FILE" JWT_SECRET "$JWT_SECRET"
   sed_kv "$VALUES_FILE" LABEL_STUDIO_PASSWORD "$LABEL_STUDIO_PASSWORD"
   sed_kv "$VALUES_FILE" LABEL_STUDIO_USER_TOKEN "$LABEL_STUDIO_USER_TOKEN"
@@ -357,7 +355,6 @@ function read_secrets() {
   while [ -z "$DB_PASSWORD" ]; do
     read_secret DB_PASSWORD "database password (required)" false
   done
-  read_secret DOMAIN "domain (enter to skip)" false
   read_secret JWT_SECRET "JWT secret" true
   if [ "$INSTALL_LABEL_STUDIO" = true ]; then
     read_secret LABEL_STUDIO_PASSWORD "Label Studio admin password (enter to skip)" false

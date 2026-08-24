@@ -29,7 +29,6 @@ cd tools
 | 节点隔离 | `Configure dedicated nodes?` | 可选，按回车跳过 |  
 | 数据库密码 | `Enter database password:` | 必填，DB_PASSWORD |
 | 证书密码 | `Enter SSL certificate password (enter to skip):` | 可选，按回车跳过 |
-| 域名 | `Enter domain (enter to skip):` | 可选，按回车跳过 |
 | JWT 密钥 | 自动生成 | 无需手动输入 |
 | Label Studio 密码 | `Enter Label Studio admin password (enter to skip):` | 可选，按回车跳过 |
 | Label Studio Token | 自动生成 | 无需手动输入 |
