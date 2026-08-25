@@ -44,7 +44,7 @@ INSTALL_LABEL_STUDIO=true
 EXECUTE_HAPROXY=true
 DATAMATE_JWT_ENABLE=true
 REAL_IP_MODE=proxy_protocol
-SKIP_NODE_SETUP=false
+SKIP_NODE_SETUP=true
 
 
 # --- 脚本内部变量 ---
