@@ -507,7 +507,7 @@ function add_label_studio_route_to_haproxy() {
 
     ## 更新 datamate 转发规则, 保存到 cluster_info_new.json
     if ! python3 "${UTILS_PATH}"/config_haproxy.py update -n "${NAMESPACE}" -p $((PORT + 1)) -b "${label_studio_service_ip}" \
-        -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio" --real-ip-mode "${REAL_IP_MODE}"; then
+        -a "${ADDRESS_TYPE}" -P "8000" -m "label-studio" --real-ip-mode ""; then
         log_error "Add label studio route to haproxy failed"
         exit 1
     fi
