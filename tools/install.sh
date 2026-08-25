@@ -301,7 +301,7 @@ function create_local_path() {
 }
 
 function random_hex() {
-  head -c 32 /dev/urandom 2>/dev/null | xxd -p -c 64 || openssl rand -hex 32
+    head -c 20 /dev/urandom 2>/dev/null | xxd -p -c 40 || openssl rand -hex 20
 }
 
 function read_secret() {
