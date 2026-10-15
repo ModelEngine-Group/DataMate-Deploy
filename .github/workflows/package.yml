@@ -117,9 +117,9 @@ jobs:
           docker pull milvusdb/milvus:v2.6.5 --platform ${{ inputs.aarch }}
           docker save -o images/milvus/milvus.tar milvusdb/milvus:v2.6.5
           docker rmi milvusdb/milvus:v2.6.5
-          docker pull minio/minio:RELEASE.2024-12-18T13-15-44Z --platform ${{ inputs.aarch }}
-          docker save -o images/milvus/minio.tar minio/minio:RELEASE.2024-12-18T13-15-44Z
-          docker rmi minio/minio:RELEASE.2024-12-18T13-15-44Z
+          docker pull ghcr.io/modelengine-group/minio:RELEASE.2024-12-18T13-15-44Z --platform ${{ inputs.aarch }}
+          docker save -o images/milvus/minio.tar ghcr.io/modelengine-group/minio:RELEASE.2024-12-18T13-15-44Z
+          docker rmi ghcr.io/modelengine-group/minio:RELEASE.2024-12-18T13-15-44Z
           docker pull milvusdb/etcd:3.5.18-r1 --platform ${{ inputs.aarch }}
           docker save -o images/milvus/etcd.tar milvusdb/etcd:3.5.18-r1
           docker rmi milvusdb/etcd:3.5.18-r1
